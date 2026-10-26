@@ -4,7 +4,7 @@
 
 #include "backend/backend.h"
 #include "backend/hexl_worker.h"
-#include "backend/solinas_2_32_1_m1_1.h"
+#include "backend/solinas.h"
 
 #include <unordered_map>
 
@@ -21,7 +21,7 @@ std::shared_ptr<MathWorker> SelectWorker(uint64_t modulus, uint64_t dimension) {
     }
 
     if (modulus == (-(1ull << 32) + 1)) {
-        auto solinas_worker = std::make_shared<Solinas_2_32_1_M1_1>(dimension);
+        auto solinas_worker = std::make_shared<SolinasBE::SolinasWorker>(dimension);
         WORKER_MAP[stupid_hash] = solinas_worker;
         return solinas_worker;
     }

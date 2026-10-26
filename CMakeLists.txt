@@ -21,7 +21,7 @@ else()
 endif ()
 
 #set( CMAKE_CXX_FLAGS "${OpenFHE_CXX_FLAGS} -flto" )
-set(CMAKE_CXX_FLAGS "-march=native -g2 -fsanitize=address")
+set(CMAKE_CXX_FLAGS "-march=native -O3 -flto")
 
 include_directories( ${OPENMP_INCLUDES} )
 include_directories( ${OpenFHE_INCLUDE} )
@@ -67,6 +67,8 @@ add_library(toothpaste SHARED
         lib/include/operators/automorphism_evaluation.h
         lib/src/operators/automorphism_evaluation.cpp
         lib/include/backend/aligned_vector.h
+        lib/include/backend/solinas.h
+        lib/include/backend/solinas_internal.h
         lib/include/operators/cggi_blind_rotation.h
         lib/include/operators/bmmp_blind_rotation.h
         lib/include/operators/mux_operator.h
@@ -100,7 +102,6 @@ add_library(toothpaste SHARED
         lib/include/operators/sap_decomposition.h
         lib/src/operators/sap_decomposer.cpp
         lib/include/backend/backend.h
-        lib/include/backend/solinas_2_32_1_m1_1.h
         lib/include/static/modulus_switching.h
         lib/src/static/modulus_switching.cpp
         lib/include/static/sample_extraction.h
@@ -136,7 +137,6 @@ add_executable(test_library
         tests/sap_decomposer_tests.cpp
         tests/noise_tests/lwe_to_lwe_noise.cpp
         tests/noise_tests/rlwe_to_rlwe_noise.cpp
-        lib/src/backend/solinas_2_32_1_m1_avx.cpp
         tests/backend/solinas_test.cpp)
 
 

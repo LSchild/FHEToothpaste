@@ -2,8 +2,7 @@
 // Created by leonard on 8/19/26.
 //
 
-#include "backend/solinas_2_32_1_m1_1.h"
-
+#include "backend/solinas.h"
 #include <gtest/gtest.h>
 #include <random>
 
@@ -20,13 +19,13 @@ protected:
     std::uniform_int_distribution<uint64_t> m_mod_distr;
     std::uniform_int_distribution<uint64_t> m_op_distr;
 
-    std::shared_ptr<Solinas_2_32_1_M1_1> m_worker;
+    std::shared_ptr<SolinasBE::SolinasWorker> m_worker;
 
     void SetUp() override {
         m_engine = std::mt19937(m_random_device());
-        m_mod_distr = std::uniform_int_distribution<uint64_t>(0, Solinas_2_32_1_M1_1::Q - 1);
+        m_mod_distr = std::uniform_int_distribution<uint64_t>(0, SolinasBE::SolinasWorker::kModulus - 1);
         m_op_distr = std::uniform_int_distribution<uint64_t>(0, 3 - 1);
-        m_worker = std::make_shared<Solinas_2_32_1_M1_1>(1u << 11);
+        m_worker = std::make_shared<SolinasBE::SolinasWorker>(1u << 11);
     }
 
     uint64_t GenElem() {
@@ -34,11 +33,12 @@ protected:
     }
 
     uint64_t ComputeExpected(TestOps op, uint64_t op0, uint64_t op1) {
+        auto Q = SolinasBE::SolinasWorker::kModulus;
         switch (op) {
             case Add: {
                 __uint128_t sum = __uint128_t(op0) + __uint128_t(op1);
-                if (sum >= Solinas_2_32_1_M1_1::Q) {
-                    sum -= Solinas_2_32_1_M1_1::Q;
+                if (sum >= Q) {
+                    sum -= Q;
                 }
                 return sum;
             }
@@ -46,12 +46,12 @@ protected:
                 if (op1 == 0) {
                     return op0;
                 }
-                auto inv = __uint128_t(Solinas_2_32_1_M1_1::Q) - op1;
+                auto inv = __uint128_t(Q) - op1;
                 return ComputeExpected(Add, op0, inv);
             }
             case Mul: {
                 auto prod = __uint128_t(op0) * __uint128_t(op1);
-                uint64_t res = (prod % __uint128_t(Solinas_2_32_1_M1_1::Q));
+                uint64_t res = (prod % __uint128_t(Q));
                 return res;
             }
         }

@@ -17,11 +17,11 @@ protected:
 
     void SetUp() override {
 
-        uint64_t Q = 36028797018972161;
+        uint64_t Q = -(1ull << 32) + 1;
         uint32_t N = 1 << 11;
         double std = 0;
-        uint64_t basebits = 8;
-        uint64_t digits = 7;
+        uint64_t basebits = 16;
+        uint64_t digits = 4;
 
         encryptor = std::make_shared<RLWEEncryptor>(Q, N, std);
         mux_operator = std::make_shared<MuxOperator>(encryptor->GetNTT(), basebits, digits);
