@@ -25,11 +25,11 @@ protected:
 
     void SetUp() override {
 
-        uint64_t Q = 36028797018972161;
+        uint64_t Q = -(1ull << 32)+1;
         uint32_t N = 1 << 11;
         uint64_t n = 100;
         double std = 0;
-        uint64_t basebits = 14;
+        uint64_t basebits = 16;
         uint64_t base = 1 << basebits;
         uint64_t digits = 4;
 

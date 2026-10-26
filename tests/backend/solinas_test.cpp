@@ -163,8 +163,8 @@ TEST_F(SolinasTestGroup, TestForwardBackward) {
 
     AlignedBuffer vector_out(m_worker->GetDimension());
 
-    m_worker->ForwardNTT(vector_out.data(), vector_in.data());
-    m_worker->BackwardNTT(vector_in.data(), vector_out.data());
+    m_worker->ForwardNTT(vector_in.data(), vector_in.data());
+    m_worker->BackwardNTT(vector_in.data(), vector_in.data());
 
     for(uint64_t i = 0; i < vector_in.size(); i++) {
         EXPECT_EQ(vector_in[i], vector_ref[i]);

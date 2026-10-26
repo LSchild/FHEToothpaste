@@ -10,11 +10,15 @@
 
 uint64_t IntLog2(uint64_t input) {
 
+    if (input <= 1) {
+        return 0;
+    }
+
     uint64_t res = 0;
-    uint64_t acc = 1;
-    while (input > acc) {
+    input -= 1;
+    while (input > 0) {
         res++;
-        acc <<= 1;
+        input >>= 1;
     }
 
     return res;

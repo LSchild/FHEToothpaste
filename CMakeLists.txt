@@ -21,7 +21,7 @@ else()
 endif ()
 
 #set( CMAKE_CXX_FLAGS "${OpenFHE_CXX_FLAGS} -flto" )
-set(CMAKE_CXX_FLAGS "-march=native -g2")
+set(CMAKE_CXX_FLAGS "-march=native -g2 -fsanitize=address")
 
 include_directories( ${OPENMP_INCLUDES} )
 include_directories( ${OpenFHE_INCLUDE} )

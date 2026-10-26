@@ -60,46 +60,50 @@ uint64_t HexlWorker::PowMod(uint64_t base, uint64_t exponent) {
     return intel::hexl::PowMod(base, exponent, m_modulus);
 }
 
-void HexlWorker::AddModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t len) {
+void HexlWorker::AddModElw(uint64_t *result, const uint64_t *left, const uint64_t *right, uint64_t len) {
     intel::hexl::EltwiseAddMod(result, left, right, len, m_modulus);
 }
 
-void HexlWorker::AddEqModElw(uint64_t *left_out, uint64_t *right, uint64_t len) {
+void HexlWorker::AddEqModElw(uint64_t *left_out, const uint64_t *right, uint64_t len) {
     intel::hexl::EltwiseAddMod(left_out, left_out, right, len, m_modulus);
 }
 
-void HexlWorker::SubModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t len) {
+void HexlWorker::SubModElw(uint64_t *result, const uint64_t* __restrict left, const uint64_t* __restrict right, uint64_t len) {
     intel::hexl::EltwiseSubMod(result, left, right, len, m_modulus);
 }
 
-void HexlWorker::SubEqModElw(uint64_t *left_out, uint64_t *right, uint64_t len) {
+void HexlWorker::SubEqModElw(uint64_t *left_out, const uint64_t* __restrict right, uint64_t len) {
     intel::hexl::EltwiseSubMod(left_out, left_out, right, len, m_modulus);
 }
 
-void HexlWorker::MulModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t len) {
+void HexlWorker::MulModElw(uint64_t *result, const uint64_t* __restrict left, const uint64_t* __restrict right, uint64_t len) {
     intel::hexl::EltwiseMultMod(result, left, right, len, m_modulus, 1);
 }
 
-void HexlWorker::MulEqModElw(uint64_t *left_out, uint64_t *right, uint64_t len) {
+void HexlWorker::MulEqModElw(uint64_t *left_out, const uint64_t* __restrict right, uint64_t len) {
     intel::hexl::EltwiseMultMod(left_out, left_out, right, len, m_modulus, 1);
 }
 
-void HexlWorker::FMAModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t *summand, uint64_t len) {
+void HexlWorker::FMAModElw(uint64_t *result, const uint64_t* __restrict left, const uint64_t* __restrict right, const uint64_t* __restrict summand, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         result[i] = FMAMod(left[i], right[i], summand[i]);
     }
 }
 
-void HexlWorker::FMAEqModElw(uint64_t *left_out, uint64_t *right, uint64_t *summand, uint64_t len) {
+void HexlWorker::FMAEqModElw(uint64_t *left_out, const uint64_t* __restrict right, const uint64_t* __restrict summand, uint64_t len) {
     FMAModElw(left_out, left_out, right, summand, len);
 }
 
-void HexlWorker::MulSModElw(uint64_t *result, uint64_t *left, uint64_t right, uint64_t len) {
+void HexlWorker::MulSModElw(uint64_t *result, const uint64_t* __restrict left, uint64_t right, uint64_t len) {
     intel::hexl::EltwiseFMAMod(result, left, right, nullptr, len, m_modulus, 1);
 }
 
 void HexlWorker::MulSEqModElw(uint64_t *left_out, uint64_t right, uint64_t len) {
     intel::hexl::EltwiseFMAMod(left_out, left_out, right, nullptr, len, m_modulus, 1);
+}
+
+void HexlWorker::ReduceModElw(uint64_t *out, const uint64_t *in, uint64_t len) {
+    intel::hexl::EltwiseReduceMod(out, in, len, m_modulus, m_modulus, 1);
 }
 
 uint64_t HexlWorker::GetModulus() const {

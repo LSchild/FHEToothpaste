@@ -44,17 +44,17 @@ void RLWEEncryptor::MakeRLWE(uint64_t *result, uint64_t *msg, uint64_t *secret_n
     }
 
 
-    intel::hexl::EltwiseMultMod(result + N, result, secret_ntt, N, Q, 1);
+    m_ntt->MulModElw(result + N, result, secret_ntt, N);
 
     if (msg_is_ntt) {
         m_ntt->ForwardNTT(tmp.data(),tmp.data());
-        intel::hexl::EltwiseAddMod(tmp.data(), tmp.data(), msg, N, Q);
+        m_ntt->AddModElw(tmp.data(), tmp.data(), msg, N);
     } else {
-        intel::hexl::EltwiseAddMod(tmp.data(), tmp.data(), msg, N, Q);
+        m_ntt->AddModElw(tmp.data(), tmp.data(), msg, N);
         m_ntt->ForwardNTT(tmp.data(),tmp.data());
     }
 
-    intel::hexl::EltwiseAddMod(result + N, result + N, tmp.data(), N, Q);
+    m_ntt->AddModElw(result + N, result + N, tmp.data(), N);
 }
 
 void RLWEEncryptor::MakeRGSW(uint64_t *result, uint64_t *msg, uint64_t *secret_ntt, uint64_t rgsw_basis, uint64_t rgsw_digits, bool msg_is_ntt) {
@@ -69,28 +69,29 @@ void RLWEEncryptor::MakeRGSW(uint64_t *result, uint64_t *msg, uint64_t *secret_n
 
     // make tmp = [msg, -s * msg]
     if (msg_is_ntt) {
-        intel::hexl::EltwiseMultMod(tmp.data(), msg, secret_ntt, N, Q, 1);
-        intel::hexl::EltwiseSubMod(tmp.data() + N, tmp.data() + N, tmp.data(), N, Q);
+        m_ntt->MulModElw(tmp.data(), msg, secret_ntt, N);
+        m_ntt->SubModElw(tmp.data() + N, tmp.data() + N, tmp.data(), N);
         std::copy(msg, msg + N, tmp.data());
     } else {
         // tmp = [ NTT(msg) | 0 | 0]
         m_ntt->ForwardNTT(tmp.data(), msg);
         // tmp = [ NTT(msg) | 0 | NTT(secret * msg)]
-        intel::hexl::EltwiseMultMod(tmp.data() + 2 * N, tmp.data(), secret_ntt, N, Q, 1);
+        m_ntt->MulModElw(tmp.data() + 2 * N, tmp.data(), secret_ntt, N);
         // tmp = [ NTT(msg) | -NTT(secret * msg) | NTT(secret * msg)]
-        intel::hexl::EltwiseSubMod(tmp.data() + N, tmp.data() + N, tmp.data() + 2 * N, N, Q);
+        m_ntt->SubModElw(tmp.data() + N, tmp.data() + N, tmp.data() + 2 * N, N);
     }
 
 
     for (uint64_t d_i = 0; d_i < max_digits - rgsw_digits; d_i++) {
-        intel::hexl::EltwiseFMAMod(tmp.data(), tmp.data(), rgsw_basis, nullptr, 2 * N, Q, 1);
+        m_ntt->MulSEqModElw(tmp.data(), rgsw_basis, 2 * N);
+        //intel::hexl::EltwiseFMAMod(tmp.data(), tmp.data(), rgsw_basis, nullptr, 2 * N, Q, 1);
     }
 
     for (uint64_t d_i = 0; d_i < rgsw_digits; d_i++) {
         uint64_t true_offset = (rgsw_digits - d_i - 1);
         MakeRLWE(result + true_offset * 2 * N, tmp.data() + N, secret_ntt, true);
         MakeRLWE(result + true_offset * 2 * N + 2 * N * rgsw_digits, tmp.data(), secret_ntt, true);
-        intel::hexl::EltwiseFMAMod(tmp.data(), tmp.data(), rgsw_basis, nullptr, 2 * N, Q, 1);
+        m_ntt->MulSEqModElw(tmp.data(), rgsw_basis, 2 * N);
     }
 
 }
@@ -100,9 +101,9 @@ void RLWEEncryptor::PhaseRLWE(uint64_t *result, uint64_t *rlwe, uint64_t *secret
     auto Q = m_ntt->GetModulus();
     AlignedBuffer tmp = AlignedBuffer(N);
 
-    intel::hexl::EltwiseMultMod(tmp.data(), rlwe, secret_ntt, N, Q, 1);
+    m_ntt->MulModElw(tmp.data(), rlwe, secret_ntt, N);
     std::copy(rlwe + N, rlwe + 2 * N, result);
-    intel::hexl::EltwiseSubMod(result, result, tmp.data(), N, Q);
+    m_ntt->SubModElw(result, result, tmp.data(), N);
     m_ntt->BackwardNTT(result, result);
 }
 

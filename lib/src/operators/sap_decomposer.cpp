@@ -66,7 +66,6 @@ Container SAPDecompositionContext::GetOutputContainer(Container container) const
     auto dummy_rlwe_out = std::dynamic_pointer_cast<RLWEContainerImpl>(m_rotation_context->GetOutputContainer(dummy_rlwe_in));
 
     auto o_var = ComputeOutputVariance(0.0);
-
     return std::make_shared<LWEContainerImpl>(dummy_rlwe_out->GetN(), dummy_rlwe_out->GetQ(), o_var);
 }
 
@@ -199,7 +198,7 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
     auto log_radix = IntLog2(radix);
     auto b_rev_shift = (sizeof(N) * 8) - (log_N - log_radix);
 
-    // TODO use mne
+
     auto precon = intel::hexl::InverseMod(N, Q);
 
     auto packing_p = m_packing_buffer.data();
@@ -379,23 +378,24 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
     auto radix_mask = radix - 1;
 
     // buffer for accumulator and extraction poly
-    AlignedBuffer rlwe_scratch(0, 5 * N);
+    AlignedBuffer rlwe_scratch(5 * N, 0);
     auto accumulator_buffer = rlwe_scratch.data();
     // acc = Q / (2 * N) * 1
+    // TODO: the scale can be set to Q / radix IF we do not restart
     accumulator_buffer[N] = Q / (2 * N);
     worker->ForwardNTT(accumulator_buffer + N, accumulator_buffer + N);
     // extraction poly encodes map x -> x mod radix, encoded in reverse
     auto extract_poly = accumulator_buffer + 2 * N;
     extract_poly[0] = 0;
     for(uint64_t i = 1; i < N; i++) {
-        extract_poly[N - i] = (i & radix_mask);
+        extract_poly[N - i] = Q - (i & radix_mask);
     }
     worker->ForwardNTT(extract_poly, extract_poly);
     // extraction output buffer
     auto extraction_buffer = accumulator_buffer + 3 * N;
 
     // buffers for current phase digit and updated input
-    std::vector<uint64_t> lwe_scratch(0, 2 * (lwe_dim_in + 1));
+    std::vector<uint64_t> lwe_scratch(2 * (lwe_dim_in + 1), 0);
     auto input_copy = lwe_scratch.data();
     auto current_sub_phase = lwe_scratch.data() + lwe_dim_in + 1;
     std::copy(input, input + lwe_dim_in + 1, input_copy);
@@ -418,7 +418,9 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
 
     auto current_output_digit = 0;
 
-    while (current_modulus > 0) {
+    // todo get rid of me
+    AlignedBuffer tmp(2 * N);
+    while (current_modulus > 1) {
         /* start by obtaining current phase digit */
         for(uint64_t i = 0; i < lwe_dim_in + 1; i++) {
             current_sub_phase[i] = input_copy[i] & radix_mask;
@@ -443,14 +445,28 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
         // actually extract
         auto current_digit_buf = output + current_output_digit * (N + 1);
         SampleExtract(current_digit_buf, extraction_buffer, 0, N, Q);
+        std::cerr << current_digit_buf[N] << std::endl;
 
 
         if ((current_output_digit + 1) % restart_iteration == 0 and current_modulus != 0) {
-            ResetAccumulator(extraction_buffer, 0);
+            ResetAccumulator(accumulator_buffer, 0);
         }
 
         // truncate: accumulator_buffer: Ntt->Ntt
-        HomTrunc(accumulator_buffer, extraction_buffer, radix);
+        worker->BackwardNTT(accumulator_buffer + N, accumulator_buffer + N);
+        for(uint64_t  i = 0; i < N; i++) {
+            std::cerr << accumulator_buffer[N + i] << " [" << i << "], ";
+        }
+        std::cerr << std::endl;
+        worker->ForwardNTT(accumulator_buffer + N, accumulator_buffer + N);
+        HomTrunc(tmp.data(), accumulator_buffer, radix);
+        std::copy(tmp.begin(), tmp.end(), accumulator_buffer);
+        worker->BackwardNTT(accumulator_buffer + N, accumulator_buffer + N);
+        for(uint64_t  i = 0; i < N; i++) {
+            std::cerr << accumulator_buffer[N + i] << " [" << i << "], ";
+        }
+        std::cerr << std::endl;
+        worker->ForwardNTT(accumulator_buffer + N, accumulator_buffer + N);
 
         current_output_digit++;
     }

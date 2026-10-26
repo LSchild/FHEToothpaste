@@ -70,7 +70,7 @@ uint64_t Solinas_2_32_1_M1_1::InvMod(uint64_t left) {
 }
 
 
-void Solinas_2_32_1_M1_1::AddModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t len) {
+void Solinas_2_32_1_M1_1::AddModElw(uint64_t *result, const uint64_t *left, const uint64_t *right, uint64_t len) {
 
     for(uint64_t i = 0; i < len; i++) {
         result[i] = AddMod(left[i], right[i]);
@@ -78,31 +78,31 @@ void Solinas_2_32_1_M1_1::AddModElw(uint64_t *result, uint64_t *left, uint64_t *
 
 }
 
-void Solinas_2_32_1_M1_1::AddEqModElw(uint64_t *result, uint64_t *right, uint64_t len) {
+void Solinas_2_32_1_M1_1::AddEqModElw(uint64_t *result, const uint64_t *right, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         result[i] = AddMod(result[i], right[i]);
     }
 }
 
-void Solinas_2_32_1_M1_1::SubModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t len) {
+void Solinas_2_32_1_M1_1::SubModElw(uint64_t *result, const uint64_t* __restrict  left, const uint64_t* __restrict right, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         result[i] = SubMod(left[i], right[i]);
     }
 }
 
-void Solinas_2_32_1_M1_1::SubEqModElw(uint64_t *left_out, uint64_t *right, uint64_t len) {
+void Solinas_2_32_1_M1_1::SubEqModElw(uint64_t *left_out, const uint64_t* __restrict right, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         left_out[i] = SubMod(left_out[i], right[i]);
     }
 }
 
-void Solinas_2_32_1_M1_1::MulModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t len) {
+void Solinas_2_32_1_M1_1::MulModElw(uint64_t *result, const uint64_t* __restrict left, const uint64_t* __restrict right, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         result[i] = MulMod(left[i], right[i]);
     }
 }
 
-void Solinas_2_32_1_M1_1::MulEqModElw(uint64_t *left_out, uint64_t *right, uint64_t len) {
+void Solinas_2_32_1_M1_1::MulEqModElw(uint64_t *left_out, const uint64_t* __restrict right, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         left_out[i] = MulMod(left_out[i], right[i]);
     }
@@ -117,19 +117,19 @@ uint64_t Solinas_2_32_1_M1_1::GetDimension() const {
 }
 
 void
-Solinas_2_32_1_M1_1::FMAModElw(uint64_t *result, uint64_t *left, uint64_t *right, uint64_t *summand, uint64_t len) {
+Solinas_2_32_1_M1_1::FMAModElw(uint64_t *result, const uint64_t* __restrict left, const uint64_t* __restrict right, const uint64_t* __restrict summand, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         result[i] = FMAMod(left[i], right[i], summand[i]);
     }
 }
 
-void Solinas_2_32_1_M1_1::FMAEqModElw(uint64_t *left_out, uint64_t *right, uint64_t *summand, uint64_t len) {
+void Solinas_2_32_1_M1_1::FMAEqModElw(uint64_t *left_out, const uint64_t* __restrict right, const uint64_t* __restrict summand, uint64_t len) {
     for(uint64_t i = 0; i < len; i++) {
         left_out[i] = FMAMod(left_out[i], right[i], summand[i]);
     }
 }
 
-void Solinas_2_32_1_M1_1::MulSModElw(uint64_t *result, uint64_t *left, uint64_t right, uint64_t len) {
+void Solinas_2_32_1_M1_1::MulSModElw(uint64_t *result, const uint64_t* __restrict left, uint64_t right, uint64_t len) {
 
     if (right == 0) {
         ZERO_UINT64_ARR(result, len);
@@ -158,6 +158,8 @@ void Solinas_2_32_1_M1_1::MulSEqModElw(uint64_t *left_out, uint64_t right, uint6
 }
 
 void Solinas_2_32_1_M1_1::Precompute() {
+
+    m_scratch = AlignedBuffer(m_ntt_dim);
 
     m_twiddle = AlignedBuffer(m_ntt_dim * 2);
     m_inverse_twiddle = AlignedBuffer(m_ntt_dim * 2);
@@ -191,15 +193,19 @@ void Solinas_2_32_1_M1_1::ForwardNTT(std::vector<uint64_t> &result, std::vector<
 void Solinas_2_32_1_M1_1::ForwardNTT(uint64_t *output, const uint64_t *input) {
 
     const auto dim = m_ntt_dim;
+   // bool copy_flag = output == input;
 
-    ZERO_UINT64_ARR(output, dim);
+   //ZERO_UINT64_ARR(output, dim);
+
     auto log2dim = IntLog2(dim);
 
     for(uint64_t i =0; i < dim; i++) {
         auto idx_rev = ReverseBitsGeneric(i) >> (64 - log2dim);
         if (idx_rev >= i) {
-            output[i] = MulMod(input[idx_rev], m_twiddle[idx_rev]);
-            output[idx_rev] = MulMod(input[i], m_twiddle[i]);
+            auto val_a = input[idx_rev];
+            auto val_b = input[i];
+            output[i] = MulMod(val_a, m_twiddle[idx_rev]);
+            output[idx_rev] = MulMod(val_b, m_twiddle[i]);
         }
     }
 
@@ -236,7 +242,7 @@ void Solinas_2_32_1_M1_1::BackwardNTT(uint64_t *output, const uint64_t *input) {
 
     const auto dim = m_ntt_dim;
 
-    ZERO_UINT64_ARR(output, m_ntt_dim);
+    //ZERO_UINT64_ARR(output, m_ntt_dim);
     //std::memcpy(output, input, sizeof(uint64_t) * m_ntt_dim);
 
     auto log2dim = IntLog2(dim);
@@ -244,8 +250,10 @@ void Solinas_2_32_1_M1_1::BackwardNTT(uint64_t *output, const uint64_t *input) {
     for(uint64_t i =0; i < dim; i++) {
         auto idx_rev = ReverseBitsGeneric(i) >> (64 - log2dim);
         if (idx_rev >= i) {
-            output[i] = input[idx_rev];
-            output[idx_rev] = input[i];
+            auto val_a = input[idx_rev];
+            auto val_b = input[i];
+            output[i] = val_a;
+            output[idx_rev] = val_b;
         }
     }
 
@@ -275,4 +283,10 @@ void Solinas_2_32_1_M1_1::BackwardNTT(uint64_t *output, const uint64_t *input) {
     }
 
     MulEqModElw(output, m_inverse_final_factor.data(), dim);
+}
+
+void Solinas_2_32_1_M1_1::ReduceModElw(uint64_t *out, const uint64_t *in, uint64_t len) {
+    for(uint64_t i =0; i < len; i++) {
+        out[i] = ReduceMod(in[i]);
+    }
 }

@@ -17,11 +17,11 @@ protected:
 
     void SetUp() override {
 
-        uint64_t Q = 2251799813773313;
-        uint32_t N = 1024;
+        uint64_t Q = 36028797018972161;
+        uint32_t N = 1 << 11;
         double std = 0;
-        uint64_t basebits = 4;
-        uint64_t digits = 13;
+        uint64_t basebits = 8;
+        uint64_t digits = 7;
 
         encryptor = std::make_shared<RLWEEncryptor>(Q, N, std);
         mux_operator = std::make_shared<MuxOperator>(encryptor->GetNTT(), basebits, digits);
@@ -118,13 +118,14 @@ TEST_F(MuxOperatorTestGroup, TestBinaryCmux) {
     mux_operator->BinaryCMux(rlwe0.data(), rgsw.data(), data.data() + 2 * N);
     encryptor->PhaseRLWE(data.data() + 2 * N,   rlwe0.data(), secret.data());
 
+
     if (bit == 1) {
         for (uint64_t i = 0; i < delta; i++) {
             uint64_t e_val = Q - (N - delta + i);
             EXPECT_EQ(data[2 * N + i], e_val);
         }
         for (uint64_t i = delta; i < N; i++) {
-            EXPECT_EQ(data[2 * N + i], i);
+            EXPECT_EQ(data[2 * N + i], i - delta);
         }
     } else {
         for (uint64_t i = 0; i < N; i++) {

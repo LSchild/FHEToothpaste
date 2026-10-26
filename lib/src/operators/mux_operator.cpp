@@ -48,13 +48,14 @@ void MuxOperator::RLWEPrimeProduct(uint64_t *acc, const uint64_t *rlwe_prime, co
         }
 
         m_ntt->ForwardNTT(scratch_space, scratch_space);
-        intel::hexl::EltwiseMultMod(acc, rlwe_prime, scratch_space, N, Q, 1);
-        intel::hexl::EltwiseMultMod(acc + N, rlwe_prime + N, scratch_space, N, Q, 1);
+        m_ntt->MulModElw(acc, rlwe_prime, scratch_space, N);
+        m_ntt->MulModElw(acc + N, rlwe_prime + N, scratch_space, N);
 
         current_shift -= m_basis_log2;
         rlwe_prime += 2 * N;
 
     }
+
 
     for(uint32_t d_i = loop_start; d_i < m_digits; d_i++) {
 
@@ -62,19 +63,23 @@ void MuxOperator::RLWEPrimeProduct(uint64_t *acc, const uint64_t *rlwe_prime, co
             scratch_space[x_i] = (polynomial[x_i] >> current_shift) & m_mask;
         }
 
+
+
         // Apply NTT to current digit
         m_ntt->ForwardNTT(scratch_space, scratch_space);
         // multiply by A component of RLWE' sample
-        intel::hexl::EltwiseMultMod(scratch_space + N, rlwe_prime, scratch_space, N, Q, 1);
+        m_ntt->MulModElw(scratch_space + N, rlwe_prime, scratch_space, N);
         // Add A * d_i to A component of accumulator
-        intel::hexl::EltwiseAddMod(acc, acc, scratch_space + N, N, Q);
+        m_ntt->AddModElw(acc, acc, scratch_space + N, N);
         // multiply digit with B component
-        intel::hexl::EltwiseMultMod(scratch_space, rlwe_prime + N, scratch_space, N, Q, 1);
+        m_ntt->MulModElw(scratch_space, rlwe_prime + N, scratch_space, N);
         // add to B component
-        intel::hexl::EltwiseAddMod(acc + N, scratch_space, acc + N, N, Q);
+        m_ntt->AddModElw(acc + N, scratch_space, acc + N, N);
 
         current_shift -= m_basis_log2;
         rlwe_prime += 2 * N;
+
+
     }
 }
 
@@ -119,13 +124,13 @@ void MuxOperator::BinaryMux(uint64_t *result, const uint64_t *const rgsw_control
     auto N = m_ntt->GetDimension();
     auto Q = m_ntt->GetModulus();
 
-    intel::hexl::EltwiseSubMod(m_scratch_space.data() + 2 * N, case_1, case_0, 2 * N, Q);
+    m_ntt->SubModElw(m_scratch_space.data() + 2 * N, case_1, case_0, 2 * N);
 
     m_ntt->BackwardNTT(m_scratch_space.data() + 2 * N, m_scratch_space.data() + 2 * N);
     m_ntt->BackwardNTT(m_scratch_space.data() + 3 * N, m_scratch_space.data() + 3 * N);
 
     ExternalProduct(result, rgsw_control, m_scratch_space.data() + 2 * N);
-    intel::hexl::EltwiseAddMod(result, result, case_0, 2 * N, Q);
+    m_ntt->AddModElw(result, result, case_0, 2 * N);
 }
 
 void MuxOperator::BinaryCMux(uint64_t *acc, const uint64_t *const rgsw_control, const uint64_t *const monomial) {
@@ -133,13 +138,17 @@ void MuxOperator::BinaryCMux(uint64_t *acc, const uint64_t *const rgsw_control, 
     auto N = m_ntt->GetDimension();
     auto Q = m_ntt->GetModulus();
 
-    intel::hexl::EltwiseMultMod(m_scratch_space.data() + 2 * N, acc, monomial, N, Q, 1);
-    intel::hexl::EltwiseMultMod(m_scratch_space.data() + 3 * N, acc + N, monomial, N, Q, 1);
+    AlignedBuffer tmp(2 * N);
+
+
+    m_ntt->MulModElw(m_scratch_space.data() + 2 * N, acc, monomial, N);
+    m_ntt->MulModElw(m_scratch_space.data() + 3 * N, acc + N, monomial, N);
 
     m_ntt->BackwardNTT(m_scratch_space.data() + 2 * N, m_scratch_space.data() + 2 * N);
     m_ntt->BackwardNTT(m_scratch_space.data() + 3 * N, m_scratch_space.data() + 3 * N);
 
-    ExternalProduct(acc, rgsw_control, m_scratch_space.data() + 2 * N, true);
+    ExternalProduct(tmp.data(), rgsw_control, m_scratch_space.data() + 2 * N);
+    m_ntt->AddModElw(acc, acc, tmp.data(), 2 * N);
 }
 
 
@@ -168,25 +177,25 @@ void MuxOperator::TernaryCMux(uint64_t *acc, const uint64_t *const rgsw_controls
     SignedDigitDecomposeRep2NTT(digit_buffer + m_digits * 2 * N, intt_buffer, m_ntt,  m_digits, m_basis_log2, m_modulus_bits);
 
     std::copy(digit_buffer, digit_buffer + 4 * N * m_digits, digit_buffer + 4 * N * m_digits);
-    intel::hexl::EltwiseMultMod(digit_buffer, rgsw_controls, digit_buffer, 8 * N * m_digits, Q, 1);
+    m_ntt->MulModElw(digit_buffer, rgsw_controls, digit_buffer, 8 * N * m_digits);
 
     // reduce left side, by carrying it forward
     for(uint64_t i = 0; i < 2 * m_digits - 1; i++) {
-        intel::hexl::EltwiseAddMod(digit_buffer + (i + 1) * 2 * N,digit_buffer + i * 2 * N, digit_buffer + (i + 1) * 2 * N, 2 * N, Q);
+        m_ntt->AddModElw(digit_buffer + (i + 1) * 2 * N,digit_buffer + i * 2 * N, digit_buffer + (i + 1) * 2 * N, 2 * N);
     }
-    intel::hexl::EltwiseMultMod(intt_buffer, digit_buffer + (2 * m_digits - 1) * 2 * N, mon_pos, N, Q, 1);
-    intel::hexl::EltwiseMultMod(intt_buffer + N, digit_buffer + (2 * m_digits - 1) * 2 * N + N, mon_pos, N, Q, 1);
-    intel::hexl::EltwiseAddMod(acc, intt_buffer, acc, 2 * N, Q);
+    m_ntt->MulModElw(intt_buffer, digit_buffer + (2 * m_digits - 1) * 2 * N, mon_pos, N);
+    m_ntt->MulModElw(intt_buffer + N, digit_buffer + (2 * m_digits - 1) * 2 * N + N, mon_pos, N);
+    m_ntt->AddModElw(acc, intt_buffer, acc, 2 * N);
 
 
     // reduce right side, by carrying it forward
     digit_buffer += 4 * N * m_digits;
     for(uint64_t i = 0; i < 2 * m_digits - 1; i++) {
-        intel::hexl::EltwiseAddMod(digit_buffer + (i + 1) * 2 * N,digit_buffer + i * 2 * N, digit_buffer + (i + 1) * 2 * N, 2 * N, Q);
+        m_ntt->AddModElw(digit_buffer + (i + 1) * 2 * N,digit_buffer + i * 2 * N, digit_buffer + (i + 1) * 2 * N, 2 * N);
     }
-    intel::hexl::EltwiseMultMod(intt_buffer, digit_buffer + (2 * m_digits - 1) * 2 * N, mon_neg, N, Q, 1);
-    intel::hexl::EltwiseMultMod(intt_buffer + N, digit_buffer + (2 * m_digits - 1) * 2 * N + N, mon_neg, N, Q, 1);
-    intel::hexl::EltwiseAddMod(acc, intt_buffer, acc, 2 * N, Q);
+    m_ntt->MulModElw(intt_buffer, digit_buffer + (2 * m_digits - 1) * 2 * N, mon_neg, N);
+    m_ntt->MulModElw(intt_buffer + N, digit_buffer + (2 * m_digits - 1) * 2 * N + N, mon_neg, N);
+    m_ntt->AddModElw(acc, intt_buffer, acc, 2 * N);
 
 }
 
@@ -200,7 +209,7 @@ void MuxOperator::MultiMux(uint64_t *rlwe_sample, uint64_t k, const uint64_t *co
     const auto Q = m_ntt->GetModulus();
     const auto rlwe_prime_size = 2 * N * m_digits;
     const auto rgsw_size = 2 * rlwe_prime_size;
-    const auto number_of_additions_before_reduction = 1ull << (62 - m_modulus_bits);
+    const auto number_of_additions_before_reduction = 1ull << (64 - m_modulus_bits);
 
     const auto scratch_space = m_scratch_space.data();
     const auto digit_buffer = m_scratch_space.data() + 2 * N;
@@ -231,29 +240,53 @@ void MuxOperator::MultiMux(uint64_t *rlwe_sample, uint64_t k, const uint64_t *co
     const auto acc_target = digit_buffer + rgsw_size;
     auto red_ctr = 0;
     // main loop
-    for (uint64_t control_idx = 0; control_idx < k; control_idx++) {
-        // do the main product
-        intel::hexl::EltwiseMultMod(acc_target, rgsw_control_bits + control_idx * rgsw_size, digit_buffer, rgsw_size, Q, 1);
-        // ext-prod output is now given as sum of rows of prior rlwe_sample
-        // note, we accumulate into the first row
-        for (uint64_t d_i = 1; d_i < 2 * m_digits; d_i++) {
-            auto addition_rhs = acc_target + d_i * 2 * N;
-            for (uint64_t coef_i = 0; coef_i < 2 * N; coef_i++) {
-                acc_target[coef_i] += addition_rhs[coef_i];
+
+    if (m_modulus_bits < 62) {
+
+        for (uint64_t control_idx = 0; control_idx < k; control_idx++) {
+            // do the main product
+            m_ntt->MulModElw(acc_target, rgsw_control_bits + control_idx * rgsw_size, digit_buffer, rgsw_size);
+            // ext-prod output is now given as sum of rows of prior rlwe_sample
+            // note, we accumulate into the first row
+            for (uint64_t d_i = 1; d_i < 2 * m_digits; d_i++) {
+                auto addition_rhs = acc_target + d_i * 2 * N;
+                for (uint64_t coef_i = 0; coef_i < 2 * N; coef_i++) {
+                    acc_target[coef_i] += addition_rhs[coef_i];
+                }
+                if (++red_ctr >= number_of_additions_before_reduction) {
+                    red_ctr = 0;
+                    m_ntt->ReduceModElw(acc_target, acc_target, 2 * N);
+                }
             }
-            if (++red_ctr >= number_of_additions_before_reduction) {
-                red_ctr = 0;
-                intel::hexl::EltwiseReduceMod(acc_target, acc_target, 2 * N, Q, Q, 1);
-            }
+
+            // multiply with monomial/weight
+            auto weight_idx = weights + control_idx * N;
+            m_ntt->MulModElw(acc_target, acc_target, weight_idx, N);
+            m_ntt->MulModElw(acc_target + N, acc_target + N, weight_idx, N);
+
+            // add to rlwe_sample
+            m_ntt->AddModElw(rlwe_sample, acc_target, rlwe_sample, 2 * N);
         }
 
-        // multiply with monomial/weight
-        auto weight_idx = weights + control_idx * N;
-        intel::hexl::EltwiseMultMod(acc_target, acc_target, weight_idx, N, Q, 1);
-        intel::hexl::EltwiseMultMod(acc_target + N, acc_target + N, weight_idx, N, Q, 1);
+    } else {
+        for (uint64_t control_idx = 0; control_idx < k; control_idx++) {
+            // do the main product
+            m_ntt->MulModElw(acc_target, rgsw_control_bits + control_idx * rgsw_size, digit_buffer, rgsw_size);
+            // ext-prod output is now given as sum of rows of prior rlwe_sample
+            // note, we accumulate into the first row
+            for (uint64_t d_i = 1; d_i < 2 * m_digits; d_i++) {
+                auto addition_rhs = acc_target + d_i * 2 * N;
+                m_ntt->AddEqModElw(acc_target, addition_rhs, 2 * N);
+            }
 
-        // add to rlwe_sample
-        intel::hexl::EltwiseAddMod(rlwe_sample, acc_target, rlwe_sample, 2 * N, Q);
+            // multiply with monomial/weight
+            auto weight_idx = weights + control_idx * N;
+            m_ntt->MulModElw(acc_target, acc_target, weight_idx, N);
+            m_ntt->MulModElw(acc_target + N, acc_target + N, weight_idx, N);
+
+            // add to rlwe_sample
+            m_ntt->AddModElw(rlwe_sample, acc_target, rlwe_sample, 2 * N);
+        }
     }
 
 }

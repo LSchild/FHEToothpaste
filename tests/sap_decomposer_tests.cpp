@@ -22,11 +22,11 @@ protected:
     void SetUp() override {
 
         // declare params
-        uint64_t Q = 36028797018972161;
+        uint64_t Q = -(1ull << 32) + 1;
         uint32_t N = 1 << 11;
         uint64_t n = 100;
         double std = 0;
-        uint64_t basebits = 14;
+        uint64_t basebits = 16;
         uint64_t base = 1 << basebits;
         uint64_t digits = 4;
 
@@ -147,4 +147,40 @@ TEST_F(SAPDecompositionTests, TestResetAccumulator) {
     }
 
     EXPECT_EQ(truncated_part, first_non_zero);
+}
+
+TEST_F(SAPDecompositionTests, TestDecomp) {
+
+    auto decomp = sap_context->ConstructOperator(test_keys);
+    auto ntt = sap_context->GetTraceContext()->GetNTT();
+
+    auto N = ntt->GetDimension();
+    auto Q = ntt->GetModulus();
+    auto radix = sap_context->GetDefaultRadix();
+    auto quot_space = N / radix;
+
+    auto lwe_Q= radix;
+    // ugly
+    auto lwe_n = decomp->GetContext()->GetLWEConversionContext()->GetTargetDimension();
+    for(uint64_t i = 0; i < 3; i++) {
+        lwe_Q = lwe_Q * lwe_Q;
+    }
+    auto encryptor = LWEEncryptor(lwe_Q,lwe_n,0.0);
+    auto decryptor = LWEEncryptor(Q, N, 0.0);
+
+    std::vector<uint64_t> ct(lwe_n + 1);
+    std::vector<uint64_t> cts_out((N + 1) * 8);
+    encryptor.MakeLWE(ct.data(), (1ull << 10) | (1ull << 5) | 1, test_keys[0].GetKeyPtr());
+
+    decomp->Decompose(cts_out.data(), ct.data(), radix);
+
+    std::vector<uint64_t> phase(2 * N, 0);
+    for(uint64_t i = 0; i < 8; i++) {
+
+        auto res = decryptor.PhaseLWE(cts_out.data() + i * (N + 1), test_keys[1].GetKeyPtr());
+        std::cerr << res << std::endl;
+
+    }
+
+
 }

@@ -4,10 +4,13 @@
 
 #include "backend/backend.h"
 #include "backend/hexl_worker.h"
+#include "backend/solinas_2_32_1_m1_1.h"
 
 #include <unordered_map>
 
-static std::unordered_map<uint64_t, std::shared_ptr<MathWorker>> WORKER_MAP = {};
+static std::unordered_map<uint64_t, std::shared_ptr<MathWorker>> WORKER_MAP = {
+
+};
 
 std::shared_ptr<MathWorker> SelectWorker(uint64_t modulus, uint64_t dimension) {
 
@@ -15,6 +18,12 @@ std::shared_ptr<MathWorker> SelectWorker(uint64_t modulus, uint64_t dimension) {
     uint64_t stupid_hash = modulus ^ (dimension | (~dimension << 32));
     if (WORKER_MAP.contains(stupid_hash)) {
         return WORKER_MAP[stupid_hash];
+    }
+
+    if (modulus == (-(1ull << 32) + 1)) {
+        auto solinas_worker = std::make_shared<Solinas_2_32_1_M1_1>(dimension);
+        WORKER_MAP[stupid_hash] = solinas_worker;
+        return solinas_worker;
     }
 
     // TODO Future: select worker based on Q & dimensio value

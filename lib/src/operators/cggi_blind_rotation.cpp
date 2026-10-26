@@ -339,19 +339,19 @@ void CGGIBlindRotator::BlindRotateBinary(const uint64_t *const __restrict lwe_ve
         // b >= N => X^b = -X^{b - N}
         b -= N;
         // m_acc = [-rlwe_A, -rlwe_B]
-        intel::hexl::EltwiseSubMod(m_acc_p, m_zero_p, rlwe_vec, 2 * N, Q);
+        ntt->SubModElw(m_acc_p, m_zero_p, rlwe_vec, 2 * N);
         // monomial ptr to X^{b - N}
         auto monomial = m_monomials.data() + b * N;
         // m_acc = [-rlwe_A * X^{b - N}, -rlwe_B * X^{b - N}]
         //       = [rlwe_A * X^b, rlwe_B * X^b]
-        intel::hexl::EltwiseMultMod(m_acc_p, m_acc_p, monomial, N, Q, 1);
-        intel::hexl::EltwiseMultMod(m_acc_p + N, m_acc_p + N, monomial, N, Q, 1);
+        ntt->MulModElw(m_acc_p, m_acc_p, monomial, N);
+        ntt->MulModElw(m_acc_p + N, m_acc_p + N, monomial, N);
     } else {
         // monomial ptr to X^b
         auto monomial = m_monomials.data() + b * N;
         // m_acc = [rlwe_A * X^b, rlwe_B * X^b]
-        intel::hexl::EltwiseMultMod(m_acc_p, rlwe_vec, monomial, N, Q, 1);
-        intel::hexl::EltwiseMultMod(m_acc_p + N, rlwe_vec + N, monomial, N, Q, 1);
+        ntt->MulModElw(m_acc_p, rlwe_vec, monomial, N);
+        ntt->MulModElw(m_acc_p + N, rlwe_vec + N, monomial, N);
     }
 
     // copy back to recycle scratch space
@@ -375,11 +375,11 @@ void CGGIBlindRotator::BlindRotateBinary(const uint64_t *const __restrict lwe_ve
         // TODO is precomputing much faster ?
         if (a_i_neg >= N) {
             a_i_neg -= N;
-            intel::hexl::EltwiseSubMod(m_acc_p, m_zero_p, m_mon_p + N * a_i_neg, N, Q);
+            ntt->SubModElw(m_acc_p, m_zero_p, m_mon_p + N * a_i_neg, N);
         } else {
             std::copy(m_mon_p + a_i_neg * N, m_mon_p + a_i_neg * N + N, m_acc_p);
         }
-        intel::hexl::EltwiseSubMod(m_acc_p,m_acc_p, one_const_p, N, 1);
+        ntt->SubModElw(m_acc_p,m_acc_p, one_const_p, N);
 
         m_mux->BinaryCMux(rlwe_vec, m_brk_i_p, m_acc_p);
     }
@@ -414,19 +414,19 @@ void CGGIBlindRotator::BlindRotateTernary(const uint64_t *const __restrict lwe_v
         // b >= N => X^b = -X^{b - N}
         b -= N;
         // m_acc = [-rlwe_A, -rlwe_B]
-        intel::hexl::EltwiseSubMod(m_acc_p, m_zero_p, rlwe_vec, 2 * N, Q);
+        ntt->SubModElw(m_acc_p, m_zero_p, rlwe_vec, 2 * N);
         // monomial ptr to X^{b - N}
         auto monomial = m_monomials.data() + b * N;
         // m_acc = [-rlwe_A * X^{b - N}, -rlwe_B * X^{b - N}]
         //       = [rlwe_A * X^b, rlwe_B * X^b]
-        intel::hexl::EltwiseMultMod(m_acc_p, m_acc_p, monomial, N, Q, 1);
-        intel::hexl::EltwiseMultMod(m_acc_p + N, m_acc_p + N, monomial, N, Q, 1);
+        ntt->MulModElw(m_acc_p, m_acc_p, monomial, N);
+        ntt->MulModElw(m_acc_p + N, m_acc_p + N, monomial, N);
     } else {
         // monomial ptr to X^b
         auto monomial = m_monomials.data() + b * N;
         // m_acc = [rlwe_A * X^b, rlwe_B * X^b]
-        intel::hexl::EltwiseMultMod(m_acc_p, rlwe_vec, monomial, N, Q, 1);
-        intel::hexl::EltwiseMultMod(m_acc_p + N, rlwe_vec + N, monomial, N, Q, 1);
+        ntt->MulModElw(m_acc_p, rlwe_vec, monomial, N);
+        ntt->MulModElw(m_acc_p + N, rlwe_vec + N, monomial, N);
     }
 
     // copy back to recycle scratch space
@@ -450,7 +450,7 @@ void CGGIBlindRotator::BlindRotateTernary(const uint64_t *const __restrict lwe_v
         if (a_i_neg >= N) {
             a_i_neg -= N;
             // m_acc_p ptr to [-X^{a_i_neg - N}, 0 ]
-            intel::hexl::EltwiseSubMod(m_acc_p, m_zero_p, m_mon_p + N * a_i_neg, N, Q);
+            ntt->SubModElw(m_acc_p, m_zero_p, m_mon_p + N * a_i_neg, N);
             // m_acc_p ptr to [-X^{a_i_neg - N}, X^{a_i} ]
             //              = [X^{a_i_neg}, X^{a_i}]
             if (a_i == N) [[unlikely]] {
@@ -461,11 +461,11 @@ void CGGIBlindRotator::BlindRotateTernary(const uint64_t *const __restrict lwe_v
         } else {
             a_i -= N;
             std::copy(m_mon_p + a_i_neg * N, m_mon_p + a_i_neg * N + N, m_acc_p);
-            intel::hexl::EltwiseSubMod(m_acc_p + N, m_zero_p + N, m_mon_p + N * a_i, N, Q);
+            ntt->SubModElw(m_acc_p + N, m_zero_p + N, m_mon_p + N * a_i, N);
         }
         // Subtract 1
-        intel::hexl::EltwiseSubMod(m_acc_p,m_acc_p, one_const_p, N, 1);
-        intel::hexl::EltwiseSubMod(m_acc_p + N,m_acc_p + N, one_const_p, N, 1);
+        ntt->SubModElw(m_acc_p,m_acc_p, one_const_p, N);
+        ntt->SubModElw(m_acc_p + N,m_acc_p + N, one_const_p, N);
 
         m_mux->TernaryCMux(rlwe_vec, m_brk_i_p, m_acc_p);
     }
