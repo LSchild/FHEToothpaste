@@ -22,11 +22,11 @@ protected:
     void SetUp() override {
 
         // declare params
-        uint64_t Q = -(1ull << 32) + 1;
+        uint64_t Q = -(1ull << 32) + 1;  uint64_t basebits = 16;
+        //uint64_t Q = 36028797018972161; uint64_t basebits = 14;
         uint32_t N = 1 << 11;
         uint64_t n = 100;
         double std = 0;
-        uint64_t basebits = 16;
         uint64_t base = 1 << basebits;
         uint64_t digits = 4;
 
@@ -48,9 +48,17 @@ protected:
         test_keys.emplace_back("LWE_KEY", tmp_key.data(), n);
 
         // gen RLWE key
+
         for (uint32_t i = 0; i< N; i++) {
             tmp_key[i] = rand() % 2;
         }
+        /*
+        uint64_t toggle = 2;
+        for(uint64_t i =0; i < N; i++) {
+            tmp_key[i] = 0;// 1- (i & 1);
+        }
+        std::fill(tmp_key.begin(), tmp_key.begin() + toggle, 1);
+*/
         test_keys.emplace_back("RLWE_KEY", tmp_key.data(), N);
 
         // ntt'ed RLWE key
@@ -157,6 +165,7 @@ TEST_F(SAPDecompositionTests, TestDecomp) {
     auto N = ntt->GetDimension();
     auto Q = ntt->GetModulus();
     auto radix = sap_context->GetDefaultRadix();
+    auto radixBits = IntLog2(radix);
     auto quot_space = N / radix;
 
     auto lwe_Q= radix;
@@ -170,16 +179,32 @@ TEST_F(SAPDecompositionTests, TestDecomp) {
 
     std::vector<uint64_t> ct(lwe_n + 1);
     std::vector<uint64_t> cts_out((N + 1) * 8);
-    encryptor.MakeLWE(ct.data(), (1ull << 10) | (1ull << 5) | 1, test_keys[0].GetKeyPtr());
+
+    std::random_device random_device;
+    std::mt19937 gen(random_device());
+    std::uniform_int_distribution<uint64_t> distribution(0, lwe_Q - 1);
+
+    auto message = distribution(gen);
+
+    encryptor.MakeLWE(ct.data(), message, test_keys[0].GetKeyPtr());
+
+    auto output_scale = Q / (2 * N);
 
     decomp->Decompose(cts_out.data(), ct.data(), radix);
 
     std::vector<uint64_t> phase(2 * N, 0);
     for(uint64_t i = 0; i < 8; i++) {
 
-        auto res = decryptor.PhaseLWE(cts_out.data() + i * (N + 1), test_keys[1].GetKeyPtr());
-        std::cerr << res << std::endl;
+        auto m_i = message % radix;
+        auto expected = m_i * output_scale;
+        message >>= radixBits;
 
+
+        auto res = decryptor.PhaseLWE(cts_out.data() + i * (N + 1), test_keys[1].GetKeyPtr());
+        //std::cerr << res << " " << output_scale * m_i << std::endl;
+
+        auto diff = res > expected ? res - expected : expected - res;
+        EXPECT_LE(diff, 1);
     }
 
 

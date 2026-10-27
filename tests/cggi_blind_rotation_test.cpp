@@ -25,13 +25,13 @@ protected:
 
     void SetUp() override {
 
-        uint64_t Q = 36028797018972161;
+        uint64_t Q = -(1ull << 32) + 1;
         uint32_t N = 1 << 11;
-        uint64_t n = 2048;
+        uint64_t n = 4096;
         double std = 0;
-        uint64_t basebits = 14;
+        uint64_t basebits = 11;
         uint64_t base = 1 << basebits;
-        uint64_t digits = 4;
+        uint64_t digits = 6;
 
         ctx_bin = std::make_shared<CGGIBlindRotationContext>(KeyDistribution::BINARY, Q, N, n, base, digits, std);
         ctx_ter = std::make_shared<CGGIBlindRotationContext>(KeyDistribution::TERNARY, Q, N, n, base, digits, std);

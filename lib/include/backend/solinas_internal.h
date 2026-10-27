@@ -16,7 +16,7 @@
 #ifndef LARGE_FUNCTIONS_GOLDILOCKS_ARITH_H
 #define LARGE_FUNCTIONS_GOLDILOCKS_ARITH_H
 
-#include "solinas.h"
+#include "solinas_worker.h"
 
 #include <cstdint>
 #include <immintrin.h>

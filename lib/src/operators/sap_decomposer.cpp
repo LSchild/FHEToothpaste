@@ -199,12 +199,12 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
     auto b_rev_shift = (sizeof(N) * 8) - (log_N - log_radix);
 
 
-    auto precon = intel::hexl::InverseMod(N, Q);
 
     auto packing_p = m_packing_buffer.data();
     auto poly_p = m_trunc_pad_poly.data();
     auto ntt = trace_context->GetNTT();
-    ZERO_UINT64_ARR(packing_p, m_packing_buffer.size());
+    auto precon =ntt->InvMod(N);
+            ZERO_UINT64_ARR(packing_p, m_packing_buffer.size());
     ZERO_UINT64_ARR(output, 2 * N);
 
     AlignedBuffer automorphism_result(2 * N);
@@ -217,11 +217,14 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
         m_last_radix = radix;
     }
 
-    intel::hexl::EltwiseFMAMod(packing_p, input, precon, nullptr, 2 * N, Q, 1);
+    ntt->MulSModElw(packing_p, input, precon, 2 * N);
+    //intel::hexl::EltwiseFMAMod(packing_p, input, precon, nullptr, 2 * N, Q, 1);
 
     // multiply by poly to move into correct coefs
-    intel::hexl::EltwiseMultMod(packing_p, packing_p, poly_p, N, Q, 1);
-    intel::hexl::EltwiseMultMod(packing_p + N, packing_p + N, poly_p, N, Q, 1);
+    ntt->MulEqModElw(packing_p, poly_p, N);
+    //intel::hexl::EltwiseMultMod(packing_p, packing_p, poly_p, N, Q, 1);
+    ntt->MulEqModElw(packing_p + N, poly_p, N);
+    //intel::hexl::EltwiseMultMod(packing_p + N, packing_p + N, poly_p, N, Q, 1);
 
     // partial trace nextlog_N - log_radix
     for(uint64_t i = 0; i < log_N - log_radix - 1; i++) {
@@ -230,7 +233,8 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
         ntt->BackwardNTT(automorphism_result.data() + N, packing_p + N);
 
         m_packer->EvalAuto(packing_p + 2 * N, automorphism_result.data(), auto_index);
-        intel::hexl::EltwiseAddMod(packing_p, packing_p, packing_p + 2 * N, 2 * N, Q);
+        ntt->AddEqModElw(packing_p, packing_p + 2 * N, 2 * N);
+        //intel::hexl::EltwiseAddMod(packing_p, packing_p, packing_p + 2 * N, 2 * N, Q);
         ZERO_UINT64_ARR(packing_p + 2 * N, 2 * N);
     }
     ZERO_UINT64_ARR(packing_p + 2 * N, m_packing_buffer.size() - 2 * N);
@@ -257,9 +261,12 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
             auto exponent_brev = ReverseBitsGeneric(exponent) >> b_rev_shift;
             shift_poly[exponent_brev] = 1;
             ntt->ForwardNTT(shift_poly.data(), shift_poly.data());
-            intel::hexl::EltwiseMultMod(current_elem, current_elem, shift_poly.data(), N, Q, 1);
-            intel::hexl::EltwiseMultMod(current_elem + N, current_elem + N, shift_poly.data(), N, Q, 1);
-            intel::hexl::EltwiseAddMod(output, current_elem, output, 2 * N, Q);
+            ntt->MulEqModElw(current_elem, shift_poly.data(), N);
+            //intel::hexl::EltwiseMultMod(current_elem, current_elem, shift_poly.data(), N, Q, 1);
+            ntt->MulEqModElw(current_elem + N, shift_poly.data(), N);
+            //intel::hexl::EltwiseMultMod(current_elem + N, current_elem + N, shift_poly.data(), N, Q, 1);
+            ntt->AddEqModElw(output, current_elem, 2 * N);
+            //intel::hexl::EltwiseAddMod(output, current_elem, output, 2 * N, Q);
             ZERO_UINT64_ARR(current_elem, 2 * N);
             stack.pop_back();
             continue;
@@ -276,12 +283,16 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
         // auto(current_elem)
         m_packer->EvalAuto(current_elem + 4 * N, current_elem + 2 * N, (1 << level) + 1);
         // current_elem - auto(current_elem)
-        intel::hexl::EltwiseSubMod(current_elem + 2 * N, current_elem, current_elem + 4 * N, 2 * N, Q);
+        ntt->SubModElw(current_elem + 2 * N, current_elem, current_elem + 4 * N, 2 * N);
+        //intel::hexl::EltwiseSubMod(current_elem + 2 * N, current_elem, current_elem + 4 * N, 2 * N, Q);
         // (current_elem - auto(current_elem)) * X^{-N/2^level}
-        intel::hexl::EltwiseMultMod(current_elem + 2 * N, current_elem + 2 * N, shift_poly.data(), N, Q, 1);
-        intel::hexl::EltwiseMultMod(current_elem + 2 * N + N, current_elem + 2 * N + N, shift_poly.data(), N, Q, 1);
+        ntt->MulEqModElw(current_elem + 2 * N, shift_poly.data(), N);
+        //intel::hexl::EltwiseMultMod(current_elem + 2 * N, current_elem + 2 * N, shift_poly.data(), N, Q, 1);
+        ntt->MulEqModElw(current_elem + 3 * N, shift_poly.data(), N);
+        //intel::hexl::EltwiseMultMod(current_elem + 2 * N + N, current_elem + 2 * N + N, shift_poly.data(), N, Q, 1);
         // current_elem + auto(current_elem)
-        intel::hexl::EltwiseAddMod(current_elem, current_elem + 4 * N, current_elem, 2 * N, Q);
+        ntt->AddEqModElw(current_elem, current_elem + 4 * N, 2 * N);
+        //intel::hexl::EltwiseAddMod(current_elem, current_elem + 4 * N, current_elem, 2 * N, Q);
         ZERO_UINT64_ARR(current_elem + 4 * N, 2 * N);
         stack.pop_back();
         stack.emplace_back(level - 1, 2 * exponent);
@@ -291,6 +302,7 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
 }
 
 void SAPDecomposer::ResetAccumulator(uint64_t *acc, uint64_t radix) {
+
     // resetting the accumulator consists of
     // - extracting the bits above \log_2(\alpha)
     // - key-switch
@@ -429,6 +441,7 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
         current_modulus >>= radix_log2;
 
         // perturb as required
+        // TODO: Fixme w.r.t interface
         current_sub_phase[lwe_dim_in] = intel::hexl::AddUIntMod(current_sub_phase[lwe_dim_in], perturb_lo, lwe_mod_in);
         input_copy[lwe_dim_in] = intel::hexl::SubUIntMod(input_copy[lwe_dim_in], perturb_hi, current_modulus);
 
@@ -437,36 +450,28 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
         m_rotator->BlindRotate(accumulator_buffer, current_sub_phase, accumulator_buffer);
 
         // multiply with extraction poly
-        intel::hexl::EltwiseMultMod(extraction_buffer, accumulator_buffer, extract_poly, N, Q, 1);
-        intel::hexl::EltwiseMultMod(extraction_buffer + N, accumulator_buffer + N, extract_poly, N, Q, 1);
+        worker->MulModElw(extraction_buffer, accumulator_buffer,extract_poly, N);
+        //intel::hexl::EltwiseMultMod(extraction_buffer, accumulator_buffer, extract_poly, N, Q, 1);
+        worker->MulModElw(extraction_buffer + N, accumulator_buffer + N, extract_poly, N);
+        //intel::hexl::EltwiseMultMod(extraction_buffer + N, accumulator_buffer + N, extract_poly, N, Q, 1);
         worker->BackwardNTT(extraction_buffer, extraction_buffer);
         worker->BackwardNTT(extraction_buffer + N, extraction_buffer + N);
 
         // actually extract
         auto current_digit_buf = output + current_output_digit * (N + 1);
         SampleExtract(current_digit_buf, extraction_buffer, 0, N, Q);
-        std::cerr << current_digit_buf[N] << std::endl;
+        //std::cerr << current_digit_buf[N] << std::endl;
 
 
         if ((current_output_digit + 1) % restart_iteration == 0 and current_modulus != 0) {
             ResetAccumulator(accumulator_buffer, 0);
         }
 
-        // truncate: accumulator_buffer: Ntt->Ntt
-        worker->BackwardNTT(accumulator_buffer + N, accumulator_buffer + N);
-        for(uint64_t  i = 0; i < N; i++) {
-            std::cerr << accumulator_buffer[N + i] << " [" << i << "], ";
-        }
-        std::cerr << std::endl;
-        worker->ForwardNTT(accumulator_buffer + N, accumulator_buffer + N);
+
+
         HomTrunc(tmp.data(), accumulator_buffer, radix);
         std::copy(tmp.begin(), tmp.end(), accumulator_buffer);
-        worker->BackwardNTT(accumulator_buffer + N, accumulator_buffer + N);
-        for(uint64_t  i = 0; i < N; i++) {
-            std::cerr << accumulator_buffer[N + i] << " [" << i << "], ";
-        }
-        std::cerr << std::endl;
-        worker->ForwardNTT(accumulator_buffer + N, accumulator_buffer + N);
+
 
         current_output_digit++;
     }

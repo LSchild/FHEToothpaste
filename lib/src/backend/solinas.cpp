@@ -13,7 +13,7 @@
 // fused into one pass that permutes data in registers.
 //
 
-#include "backend/solinas.h"
+#include "backend/solinas_worker.h"
 #include "backend/solinas_internal.h"
 
 #include <stdexcept>

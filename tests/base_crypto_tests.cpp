@@ -17,7 +17,7 @@ protected:
     AlignedBuffer secret_noise;
 
     void SetUp() override {
-        uint64_t Q = 2251799813773313;
+        uint64_t Q = -(1ull << 32) + 1; 2251799813773313;
         uint32_t N = 1024;
         double std = 0;
         double std2 = 3.19;
@@ -83,7 +83,7 @@ protected:
     AlignedBuffer secret_noise;
 
     void SetUp() override {
-        uint64_t Q = 2251799813773313;
+        uint64_t Q = -(1ull << 32) + 1;// 2251799813773313;
         uint32_t n = 734;
         double std = 0;
         double std2 = 3.19;

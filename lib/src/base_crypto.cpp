@@ -139,30 +139,33 @@ void LWEEncryptor::MakeLWE(uint64_t *result, uint64_t msg, const uint64_t *const
     lbcrypto::DiscreteUniformGeneratorImpl<NativeVector> sampler_unif(m_modulus);
     lbcrypto::DiscreteGaussianGeneratorImpl<NativeVector> sampler_gauss(m_std);
     auto vec = sampler_unif.GenerateVector(m_dimension);
-
     auto b = sampler_gauss.GenerateInteger(m_modulus).ConvertToInt<uint64_t>();
 
-    auto precon = intel::hexl::MultiplyFactor(1, 64, m_modulus).BarrettFactor();
+    auto worker = SelectWorkerArbitraryDimension(m_modulus);
+
+    //auto precon = intel::hexl::MultiplyFactor(1, 64, m_modulus).BarrettFactor();
 
     for (uint64_t i = 0; i < m_dimension; i++) {
-        auto a_i = vec[i].ConvertToInt<uint64_t>();
-        auto prod = intel::hexl::MultiplyMod(a_i, secret[i], precon, m_modulus);
+        auto a_i =  vec[i].ConvertToInt<uint64_t>();
+        auto prod = worker->MulMod(a_i, secret[i]);//  intel::hexl::MultiplyMod(a_i, secret[i], precon, m_modulus);
         result[i] = a_i;
-        b = intel::hexl::AddUIntMod(b, prod, m_modulus);
+        b = worker->AddMod(b, prod); //  intel::hexl::AddUIntMod(b, prod, m_modulus);
     }
-    result[m_dimension] = intel::hexl::AddUIntMod(b, msg, m_modulus);
+    result[m_dimension] = worker->AddMod(b, msg);// intel::hexl::AddUIntMod(b, msg, m_modulus);
 }
 
 void LWEEncryptor::PhaseLWE(uint64_t *result, uint64_t *lwe_vec, const uint64_t *const secret) const {
     uint64_t  acc = 0;
-    auto precon = intel::hexl::MultiplyFactor(1, 64, m_modulus).BarrettFactor();
+    //auto precon = intel::hexl::MultiplyFactor(1, 64, m_modulus).BarrettFactor();
+    auto worker = SelectWorkerArbitraryDimension(m_modulus);
+
 
     for (uint64_t i = 0; i < m_dimension; i++) {
-        auto prod = intel::hexl::MultiplyMod(lwe_vec[i], secret[i], precon, m_modulus);
-        acc = intel::hexl::AddUIntMod(acc, prod, m_modulus);
+        auto prod = worker->MulMod(lwe_vec[i], secret[i]);
+        acc = worker->AddMod(acc, prod);
     }
 
-    *result = intel::hexl::SubUIntMod(lwe_vec[m_dimension], acc, m_modulus);
+    *result = worker->SubMod(lwe_vec[m_dimension], acc);
 }
 
 uint64_t LWEEncryptor::PhaseLWE(uint64_t *lwe_vec,const uint64_t *const secret) const {

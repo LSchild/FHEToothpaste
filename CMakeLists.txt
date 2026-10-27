@@ -22,6 +22,7 @@ endif ()
 
 #set( CMAKE_CXX_FLAGS "${OpenFHE_CXX_FLAGS} -flto" )
 set(CMAKE_CXX_FLAGS "-march=native -O3 -flto")
+#set(CMAKE_CXX_FLAGS "-mavx2 -g2")
 
 include_directories( ${OPENMP_INCLUDES} )
 include_directories( ${OpenFHE_INCLUDE} )
@@ -67,7 +68,7 @@ add_library(toothpaste SHARED
         lib/include/operators/automorphism_evaluation.h
         lib/src/operators/automorphism_evaluation.cpp
         lib/include/backend/aligned_vector.h
-        lib/include/backend/solinas.h
+        lib/include/backend/solinas_worker.h
         lib/include/backend/solinas_internal.h
         lib/include/operators/cggi_blind_rotation.h
         lib/include/operators/bmmp_blind_rotation.h
@@ -115,6 +116,8 @@ add_library(toothpaste SHARED
         lib/include/operators/ks_function_evaluator.h
         lib/src/operators/ks_function_evaluator.cpp
         lib/src/backend/solinas.cpp
+        lib/include/backend/trivial_worker.h
+        lib/src/backend/trivial_worker.cpp
 )
 
 target_include_directories(toothpaste PUBLIC lib/include)

@@ -2,7 +2,7 @@
 // Created by leonard on 8/19/26.
 //
 
-#include "backend/solinas.h"
+#include "backend/solinas_worker.h"
 #include <gtest/gtest.h>
 #include <random>
 

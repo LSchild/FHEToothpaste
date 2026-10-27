@@ -206,11 +206,9 @@ void RLWEtoRLWEConverter::KeyGen(const uint64_t *const source_key, const uint64_
 
     for(uint64_t i = 0; i < digits; i++) {
         auto chunk = ksk + i * 2 * N;
-        intel::hexl::EltwiseFMAMod(gadget_entry.data(), source_key, g_ij, nullptr, N, modulus, 1);
+        ntt->MulSModElw(gadget_entry.data(), source_key, g_ij, N);
+        //intel::hexl::EltwiseFMAMod(gadget_entry.data(), source_key, g_ij, nullptr, N, modulus, 1);
         encryptor.MakeRLWE(chunk, gadget_entry.data(), target_key_ntt.data());
-
-        // for the case of the final digit where digits * basebits > Q bits
-
         g_ij >>= basis_bits;
         if (g_ij == 0) {
             g_ij = 1;
@@ -235,16 +233,19 @@ void RLWEtoRLWEConverter::Convert(uint64_t *output, const uint64_t *const input)
 
     SignedDigitDecomposeRep2NTT(acc, input, ntt, digits, basis_bits, modulus_bits);
 
-    intel::hexl::EltwiseMultMod(acc, acc, m_ksk.data(), 2 * N * digits, modulus, 1);
+    ntt->MulEqModElw(acc, m_ksk.data(), 2 * N * digits);
+    //intel::hexl::EltwiseMultMod(acc, acc, m_ksk.data(), 2 * N * digits, modulus, 1);
 
     for(uint64_t i = 1; i < digits; i++) {
-        intel::hexl::EltwiseAddMod(acc, acc, acc + i * 2 * N, 2 * N, modulus);
+        ntt->AddEqModElw(acc, acc + i * 2 * N, 2 * N);
+        //intel::hexl::EltwiseAddMod(acc, acc, acc + i * 2 * N, 2 * N, modulus);
     }
-
-    intel::hexl::EltwiseSubMod(output, output, acc, 2 * N, modulus);
+    ntt->SubEqModElw(output, acc, 2 * N);
+    //intel::hexl::EltwiseSubMod(output, output, acc, 2 * N, modulus);
 
     // DANGER: Correct provided b @input + N is in NTT format
-    intel::hexl::EltwiseAddMod(output + N, output + N, input + N, N, modulus);
+    ntt->AddEqModElw(output + N, input + N, N);
+    //intel::hexl::EltwiseAddMod(output + N, output + N, input + N, N, modulus);
 }
 
 const std::shared_ptr<const RLWEConversionContext> RLWEtoRLWEConverter::GetContext() const {

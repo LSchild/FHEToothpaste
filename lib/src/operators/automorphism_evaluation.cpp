@@ -189,6 +189,7 @@ void AutomorphismEvaluator::ApplyAutomorphism(uint64_t *output, const uint64_t *
     auto m_auto_idx = m_automorphism_params->GetAutomorphismIndex();
     const uint32_t stride = 4;
 
+
     for(uint64_t i = 0; i < N; i+=stride) {
         for(uint32_t j = 0; j < stride; j++) {
             auto idx = i + j;
@@ -198,7 +199,7 @@ void AutomorphismEvaluator::ApplyAutomorphism(uint64_t *output, const uint64_t *
             output[poly_idx] = input[idx];
 
             if (flip_sign) {
-                output[poly_idx] = intel::hexl::SubUIntMod(0, output[poly_idx], Q);
+                output[poly_idx] = output[poly_idx] == 0 ? 0 : Q - output[poly_idx]; // intel::hexl::SubUIntMod(0, output[poly_idx], Q);
             }
         }
     }

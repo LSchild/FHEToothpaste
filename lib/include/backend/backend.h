@@ -64,4 +64,6 @@ struct MathWorker {
 
 std::shared_ptr<MathWorker> SelectWorker(uint64_t modulus, uint64_t dimension);
 
+std::shared_ptr<MathWorker> SelectWorkerArbitraryDimension(uint64_t modulus);
+
 #endif //LARGE_FUNCTIONS_BACKEND_H
