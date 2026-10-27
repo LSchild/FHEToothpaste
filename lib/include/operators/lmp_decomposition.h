@@ -146,6 +146,10 @@ private:
                   std::unique_ptr<BlindRotator> rotator,
                   std::unique_ptr<LWEtoLWEConverter> converter, uint64_t beta);
 
+    void EvalF0(uint64_t* output, uint64_t* input);
+
+    void EvalF1(uint64_t* output, uint64_t* input);
+
     /* context storing constants etc. */
     std::shared_ptr<const LMPDecompositionContext> m_context;
     /* pointer to interface instance for blind-rotation */
