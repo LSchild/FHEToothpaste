@@ -28,6 +28,7 @@ enum OperatorID {
     CONV_LWE_LWE,
     CONV_LWE_RGSW,
     DECOMP_SAP,
+    DECOMP_LMP,
     EVAL_AUTO,
     EVAL_TRACE,
     PACK_LWE_TO_RLWE,

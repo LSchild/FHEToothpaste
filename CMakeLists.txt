@@ -118,6 +118,8 @@ add_library(toothpaste SHARED
         lib/src/backend/solinas.cpp
         lib/include/backend/trivial_worker.h
         lib/src/backend/trivial_worker.cpp
+        lib/include/operators/lmp_decomposition.h
+        lib/src/operators/lmp_decomposition.cpp
 )
 
 target_include_directories(toothpaste PUBLIC lib/include)
