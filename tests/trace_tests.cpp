@@ -15,9 +15,9 @@ protected:
     std::shared_ptr<TraceEvaluationContext> m_auto_params;
 
     void SetUp() override {
-        uint64_t Q = 2251799813773313;
-        uint32_t N = 1024;
-        uint32_t basis = 1 << 13;
+        uint64_t Q = -(1ull << 32) + 1;
+        uint32_t N = 1 << 12;
+        uint32_t basis = 1 << 16;
         uint32_t digits = 4;
         double std = 0;
 
@@ -56,6 +56,7 @@ TEST_F(TraceTestGroup, TestAutomorphism) {
     for(uint32_t i = 0; i < N; i++) {
         msg[i] = rand() % Q;
     }
+
 
     encryptor.MakeRLWE(ct.data(),msg.data(), secret_ntt.data(), false);
     e_ntt->BackwardNTT(ct.data(),ct.data());

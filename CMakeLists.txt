@@ -22,7 +22,7 @@ endif ()
 
 #set( CMAKE_CXX_FLAGS "${OpenFHE_CXX_FLAGS} -flto" )
 set(CMAKE_CXX_FLAGS "-march=native -O3 -flto")
-#set(CMAKE_CXX_FLAGS "-mavx2 -g2")
+#set(CMAKE_CXX_FLAGS "-mavx2 -g3")
 
 include_directories( ${OPENMP_INCLUDES} )
 include_directories( ${OpenFHE_INCLUDE} )

@@ -10,6 +10,8 @@
 #include "utils/generic_utils.h"
 #include "utils/math_utils.h"
 
+#include <iostream>
+
 TraceEvaluationContext::TraceEvaluationContext(KeyDistribution source_key_distribution, uint64_t modulus, uint64_t N,
                                                uint64_t basis, uint64_t digits, double std) {
     m_auto_context = std::make_shared<AutomorphismContext>(source_key_distribution, modulus, N, basis, digits, std, 3);
@@ -135,18 +137,22 @@ void TraceEvaluator::Eval(uint64_t *output, const uint64_t *input) {
     auto ntt = m_context->GetNTT();
     auto N = m_context->GetDimension();
     auto Q = m_context->GetModulus();
-    auto N_inverse = intel::hexl::InverseMod(N, Q);
+    auto N_inverse = ntt->InvMod(N);
 
     // TODO: Preallocate ?
     AlignedBuffer buffer(2 * N, 0);
     const auto buf_p = buffer.data();
-    intel::hexl::EltwiseFMAMod(output, input, N_inverse, nullptr, 2 * N, Q, 1);
+    ntt->MulSModElw(output, input, N_inverse, 2 * N);
 
     for(auto & m_trace_evaluator : std::views::reverse(m_trace_evaluators)) {
+
+        std::cerr << std::endl;
         m_trace_evaluator->Eval(buf_p, output);
         ntt->BackwardNTT(buf_p, buf_p);
         ntt->BackwardNTT(buf_p + N, buf_p + N);
-        intel::hexl::EltwiseAddMod(output, buf_p, output, 2 * N, Q);
+
+        ntt->AddEqModElw(output, buf_p, 2 * N);
+
         ZERO_UINT64_ARR(buf_p, 2 * N);
     }
 

@@ -198,13 +198,11 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
     auto log_radix = IntLog2(radix);
     auto b_rev_shift = (sizeof(N) * 8) - (log_N - log_radix);
 
-
-
     auto packing_p = m_packing_buffer.data();
     auto poly_p = m_trunc_pad_poly.data();
     auto ntt = trace_context->GetNTT();
     auto precon =ntt->InvMod(N);
-            ZERO_UINT64_ARR(packing_p, m_packing_buffer.size());
+    ZERO_UINT64_ARR(packing_p, m_packing_buffer.size());
     ZERO_UINT64_ARR(output, 2 * N);
 
     AlignedBuffer automorphism_result(2 * N);
@@ -227,7 +225,7 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
     //intel::hexl::EltwiseMultMod(packing_p + N, packing_p + N, poly_p, N, Q, 1);
 
     // partial trace nextlog_N - log_radix
-    for(uint64_t i = 0; i < log_N - log_radix - 1; i++) {
+    for(uint64_t i = 0; i < log_radix; i++) {
         auto auto_index = (1 << (log_N - i)) + 1;
         ntt->BackwardNTT(automorphism_result.data(), packing_p);
         ntt->BackwardNTT(automorphism_result.data() + N, packing_p + N);
@@ -237,6 +235,18 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
         //intel::hexl::EltwiseAddMod(packing_p, packing_p, packing_p + 2 * N, 2 * N, Q);
         ZERO_UINT64_ARR(packing_p + 2 * N, 2 * N);
     }
+
+    /*
+    ntt->BackwardNTT(packing_p+N, packing_p+N);
+    bool flag = false;
+    for(uint64_t  i = 0; i < N; i++) {
+        std::cerr <<packing_p[i+N] << ", ";
+        if (packing_p[i+N] !=0)
+            flag = true;
+    }
+    std::cerr << std::endl << flag << std::endl;
+    ntt->ForwardNTT(packing_p+N, packing_p+N); */
+
     ZERO_UINT64_ARR(packing_p + 2 * N, m_packing_buffer.size() - 2 * N);
 
 
@@ -244,7 +254,7 @@ void SAPDecomposer::HomTrunc(uint64_t *output, uint64_t *input, uint64_t radix) 
     std::vector<std::pair<uint64_t, uint64_t>> stack;
     stack.reserve(2 * log_N);
     uint64_t stack_head = 1;
-    stack.emplace_back(log_radix + 1, 0);
+    stack.emplace_back(log_N - log_radix, 0);
 
     // TODO optimize me away
     // TODO: monomial NTTs can be computed in O(N) instead of O(log(N) * N)
@@ -400,7 +410,7 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
     auto extract_poly = accumulator_buffer + 2 * N;
     extract_poly[0] = 0;
     for(uint64_t i = 1; i < N; i++) {
-        extract_poly[N - i] = Q - (i & radix_mask);
+        extract_poly[N - i] = worker->SubMod(0, i & radix_mask);
     }
     worker->ForwardNTT(extract_poly, extract_poly);
     // extraction output buffer
@@ -449,6 +459,8 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
         worker->BackwardNTT(accumulator_buffer + N, accumulator_buffer + N);
         m_rotator->BlindRotate(accumulator_buffer, current_sub_phase, accumulator_buffer);
 
+
+
         // multiply with extraction poly
         worker->MulModElw(extraction_buffer, accumulator_buffer,extract_poly, N);
         //intel::hexl::EltwiseMultMod(extraction_buffer, accumulator_buffer, extract_poly, N, Q, 1);
@@ -456,6 +468,8 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
         //intel::hexl::EltwiseMultMod(extraction_buffer + N, accumulator_buffer + N, extract_poly, N, Q, 1);
         worker->BackwardNTT(extraction_buffer, extraction_buffer);
         worker->BackwardNTT(extraction_buffer + N, extraction_buffer + N);
+
+
 
         // actually extract
         auto current_digit_buf = output + current_output_digit * (N + 1);
@@ -470,6 +484,8 @@ void SAPDecomposer::Decompose(uint64_t *output, const uint64_t *const input, uin
 
 
         HomTrunc(tmp.data(), accumulator_buffer, radix);
+
+
         std::copy(tmp.begin(), tmp.end(), accumulator_buffer);
 
 

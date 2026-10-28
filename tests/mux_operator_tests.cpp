@@ -18,7 +18,7 @@ protected:
     void SetUp() override {
 
         uint64_t Q = -(1ull << 32) + 1;
-        uint32_t N = 1 << 11;
+        uint32_t N = 1 << 12;
         double std = 0;
         uint64_t basebits = 16;
         uint64_t digits = 4;
@@ -177,8 +177,11 @@ TEST_F(MuxOperatorTestGroup, TestTernaryCMUX) {
         data[a] = 1;
         data[N + a_idx] = Q - 1;
     }
-    data[0] = (data[0] + Q - 1) % Q;
-    data[N] = (data[N] + Q - 1) % Q;
+
+    auto ntt = encryptor->GetNTT();
+
+    data[0] =  ntt->SubMod(data[0], 1);
+    data[N] = ntt->SubMod(data[N],1);
 
     encryptor->GetNTT()->ForwardNTT(data.data(), data.data());
     encryptor->GetNTT()->ForwardNTT(data.data() + N, data.data() + N);

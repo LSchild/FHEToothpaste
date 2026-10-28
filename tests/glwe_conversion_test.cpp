@@ -20,12 +20,12 @@ protected:
     AlignedBuffer secret_lwe_src, secret_lwe_target;
 
     void SetUp() override {
-        uint64_t Q = 36028797018972161;
+        uint64_t Q = 36028797018972161; -(1ull << 32) + 1;
         uint32_t N = 1 << 11;
-        uint64_t n_in = 1234;
-        uint64_t n_out = 567;
-        uint64_t L = 1 << 8;
-        uint64_t digits = 7;
+        uint64_t n_in = N;
+        uint64_t n_out = 2048;
+        uint64_t L = 1 << 14;
+        uint64_t digits = 4;
         double std = 0;
 
         enc_rlwe = std::make_shared<RLWEEncryptor>(Q, N, std);
@@ -91,8 +91,14 @@ TEST_F(GLWEConversionTestGroup, TestLWEtoLWE) {
     auto msg = 1 + (random() % (t - 1));
     auto encoded_msg = scal * msg;
     enc_lwe_in->MakeLWE(lwe_in.data(), encoded_msg, secret_lwe_src.data());
+    auto start = std::chrono::high_resolution_clock::now();
 
     lwe_conv->Convert(lwe_out.data(), lwe_in.data());
+
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stop-start).count();
+    std::cerr << elapsed<< std::endl;
 
     auto val = enc_lwe_out->PhaseLWE(lwe_out.data(), secret_lwe_target.data());
     uint64_t corrected_val = std::round(double(t * val) / double(Q));
@@ -111,9 +117,7 @@ TEST_F(GLWEConversionTestGroup, TestRLWEtoRLWE) {
     AlignedBuffer res(N, 0);
 
     enc_rlwe->MakeRLWE(rlwe_in.data(), msg.data(), secret_rlwe_src_ntt.data());
-    enc_rlwe->GetNTT()->BackwardNTT(rlwe_in.data() + N, rlwe_in.data() + N);
-    //enc_rlwe->GetNTT()->ComputeInverse(rlwe_in.data() + N, rlwe_in.data() + N, 1, 1);
-
+    enc_rlwe->GetNTT()->BackwardNTT(rlwe_in.data(), rlwe_in.data());
 
     rlwe_conv->Convert(rlwe_out.data(), rlwe_in.data());
     enc_rlwe->PhaseRLWE(res.data(), rlwe_out.data(), secret_rlwe_target_ntt.data());

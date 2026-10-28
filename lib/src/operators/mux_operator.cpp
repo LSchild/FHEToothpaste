@@ -176,6 +176,8 @@ void MuxOperator::TernaryCMux(uint64_t *acc, const uint64_t *const rgsw_controls
     m_ntt->BackwardNTT(intt_buffer, acc + N);
     SignedDigitDecomposeRep2NTT(digit_buffer + m_digits * 2 * N, intt_buffer, m_ntt,  m_digits, m_basis_log2, m_modulus_bits);
 
+
+
     std::copy(digit_buffer, digit_buffer + 4 * N * m_digits, digit_buffer + 4 * N * m_digits);
     m_ntt->MulModElw(digit_buffer, rgsw_controls, digit_buffer, 8 * N * m_digits);
 
@@ -183,7 +185,7 @@ void MuxOperator::TernaryCMux(uint64_t *acc, const uint64_t *const rgsw_controls
     for(uint64_t i = 0; i < 2 * m_digits - 1; i++) {
         m_ntt->AddModElw(digit_buffer + (i + 1) * 2 * N,digit_buffer + i * 2 * N, digit_buffer + (i + 1) * 2 * N, 2 * N);
     }
-    m_ntt->MulModElw(intt_buffer, digit_buffer + (2 * m_digits - 1) * 2 * N, mon_pos, N);
+    m_ntt->MulModElw(intt_buffer,     digit_buffer + (2 * m_digits - 1) * 2 * N,     mon_pos, N);
     m_ntt->MulModElw(intt_buffer + N, digit_buffer + (2 * m_digits - 1) * 2 * N + N, mon_pos, N);
     m_ntt->AddModElw(acc, intt_buffer, acc, 2 * N);
 

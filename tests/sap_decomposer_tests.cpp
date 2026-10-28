@@ -24,15 +24,18 @@ protected:
         // declare params
         uint64_t Q = -(1ull << 32) + 1;  uint64_t basebits = 16;
         //uint64_t Q = 36028797018972161; uint64_t basebits = 14;
-        uint32_t N = 1 << 11;
-        uint64_t n = 100;
+        uint32_t N = 1 << 12;
+        uint64_t n = 2048;
         double std = 0;
         uint64_t base = 1 << basebits;
         uint64_t digits = 4;
 
+        uint64_t auto_base = 1 << 16;
+        uint64_t auto_digits = 4;
+
         auto params_bin = std::make_shared<CGGIBlindRotationContext>(KeyDistribution::BINARY, Q, N, n, base, digits, std);
         auto ntt = params_bin->GetNTT();
-        auto trace_params = std::make_shared<TraceEvaluationContext>(BINARY, ntt, base, digits, std);
+        auto trace_params = std::make_shared<TraceEvaluationContext>(BINARY, ntt, auto_base, auto_digits, std);
         auto lwe_conversion_params = std::make_shared<LWEConversionContext>(BINARY, Q, N, n, base, digits, std);
 
         std::shared_ptr<OperatorContext<BlindRotator>> params_rot = std::reinterpret_pointer_cast<OperatorContext<BlindRotator>>(params_bin);
@@ -75,6 +78,7 @@ TEST_F(SAPDecompositionTests, TestHomTrunc) {
 
     auto N = ntt->GetDimension();
     auto Q = ntt->GetModulus();
+    std::cerr << N << " " << Q << std::endl;
     auto radix = sap_context->GetDefaultRadix();
     auto quot_space = N / radix;
 
@@ -82,7 +86,7 @@ TEST_F(SAPDecompositionTests, TestHomTrunc) {
     std::mt19937 gen(random_device());
 
     std::uniform_int_distribution<uint64_t> hi_dist(0, quot_space);
-    std::uniform_int_distribution<uint64_t> lo_dist(0, radix);
+    std::uniform_int_distribution<uint64_t> lo_dist(0, radix - 1);
 
     auto truncated_part = hi_dist(gen);
     auto exponent = truncated_part * radix + lo_dist(gen);
@@ -92,13 +96,25 @@ TEST_F(SAPDecompositionTests, TestHomTrunc) {
     rlwe_sample[N + exponent] = 1;
     ntt->ForwardNTT(rlwe_sample.data() + N, rlwe_sample.data() + N);
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     decomp->HomTrunc(rlwe_sample_out.data(), rlwe_sample.data(), radix);
 
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stop-start).count();
+
+    std::cerr << exponent <<  " "  << truncated_part <<  std::endl;
+    std::cerr << "Took " << elapsed << std::endl;
+
     auto ntt_key = test_keys[2];
-    intel::hexl::EltwiseMultMod(rlwe_sample_out.data(), rlwe_sample_out.data(), ntt_key.GetKeyPtr(), N, Q, 1);
-    intel::hexl::EltwiseSubMod(rlwe_sample_out.data() + N, rlwe_sample_out.data() + N, rlwe_sample_out.data(), N, Q);
+    ntt->MulModElw(rlwe_sample_out.data(), rlwe_sample_out.data(), ntt_key.GetKeyPtr(), N);
+    ntt->SubModElw(rlwe_sample_out.data() + N, rlwe_sample_out.data() + N, rlwe_sample_out.data(), N);
     ntt->BackwardNTT(rlwe_sample_out.data(), rlwe_sample_out.data() + N);
 
+    for(uint64_t i = 0; i < N; i++) {
+        std::cerr << rlwe_sample_out[i] << ",";
+    }
+    std::cerr << std::endl;
 
     for(uint64_t i = 0; i < N; i++) {
         if (i != truncated_part) {
@@ -190,21 +206,31 @@ TEST_F(SAPDecompositionTests, TestDecomp) {
 
     auto output_scale = Q / (2 * N);
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     decomp->Decompose(cts_out.data(), ct.data(), radix);
+
+    long double d_2N = 2 * N;
+    long double d_Q = std::powl(2.0, 64) - std::powl(2.0,32) + 1.0;
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stop-start).count();
+
+    std::cerr << "Took " << elapsed << std::endl;
+    std::cerr << d_2N << " " << d_Q << std::endl;
 
     std::vector<uint64_t> phase(2 * N, 0);
     for(uint64_t i = 0; i < 8; i++) {
 
         auto m_i = message % radix;
-        auto expected = m_i * output_scale;
+        auto expected = m_i;
         message >>= radixBits;
 
 
         auto res = decryptor.PhaseLWE(cts_out.data() + i * (N + 1), test_keys[1].GetKeyPtr());
-        //std::cerr << res << " " << output_scale * m_i << std::endl;
-
-        auto diff = res > expected ? res - expected : expected - res;
-        EXPECT_LE(diff, 1);
+        uint64_t res_rounded = std::roundl((d_2N * (long double )(res)) / d_Q);
+        std::cerr << m_i << " " << res << " " << res_rounded << std::endl;
+        EXPECT_EQ(res_rounded, expected);
     }
 
 
