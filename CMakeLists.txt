@@ -140,7 +140,9 @@ add_executable(test_library
         tests/sap_decomposer_tests.cpp
         tests/noise_tests/lwe_to_lwe_noise.cpp
         tests/noise_tests/rlwe_to_rlwe_noise.cpp
-        tests/backend/solinas_test.cpp)
+        tests/backend/solinas_test.cpp
+        tests/negacyclic_func_test.cpp
+)
 
 
 target_link_libraries(test_library

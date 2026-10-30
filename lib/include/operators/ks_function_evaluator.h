@@ -12,7 +12,7 @@
 
 struct KSFunctionEvaluator;
 
-struct KSFunctionEvaluationContext : OperatorContext<FunctionEvaluator>, public std::enable_shared_from_this<KSFunctionEvaluationContext> {
+struct KSFunctionEvaluationContext : OperatorContext<KSFunctionEvaluator>, public std::enable_shared_from_this<KSFunctionEvaluationContext> {
 
     KSFunctionEvaluationContext(std::shared_ptr<OperatorContext<BlindRotator>> blind_rotation_context, std::shared_ptr<LWEConversionContext> converter, bool estimate_padding = false);
 
@@ -24,7 +24,7 @@ struct KSFunctionEvaluationContext : OperatorContext<FunctionEvaluator>, public 
 
     [[nodiscard]] long double ComputeOutputVariance(long double input_variance = 0.0) const override;
 
-    [[nodiscard]] std::unique_ptr<FunctionEvaluator> ConstructOperator(const std::vector<GenericKey>& keys) const override;
+    [[nodiscard]] std::unique_ptr<KSFunctionEvaluator> ConstructOperator(const std::vector<GenericKey>& keys) const override;
 
     /** Describes the input LWE sample
      *
@@ -62,7 +62,7 @@ private:
 
 };
 
-struct KSFunctionEvaluator : FunctionEvaluator {
+struct KSFunctionEvaluator : FunctionEvaluator<KSFunctionEvaluationContext> {
 
     friend struct KSFunctionEvaluationContext;
 
@@ -73,7 +73,7 @@ struct KSFunctionEvaluator : FunctionEvaluator {
      * @param function Function to be evaluated
      * @param output Stage at which to output, either right after blind-rotation or after key-switching.
      */
-    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, std::function<uint64_t(uint64_t)>& function, OutputKeyType output) override;
+    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, std::function<uint64_t(uint64_t)>& function) override;
 
     /** Function evaluation with a provided negacyclic function mapping Z_{2N} to Z_Q
      * where N is the ring dimension and Q is the ring Q
@@ -82,7 +82,7 @@ struct KSFunctionEvaluator : FunctionEvaluator {
      * @param function Function to be evaluated
      * @param output Stage at which to output, either right after blind-rotation or after key-switching.
      */
-    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input, std::function<uint64_t(uint64_t)>& function, OutputKeyType output) override;
+    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input, std::function<uint64_t(uint64_t)>& function) override;
 
     /** Function evaluation with a (possibly encrypted) negacyclic LUT in lut_rlwe
      * where N is the ring dimension and Q is the ring Q
@@ -91,7 +91,7 @@ struct KSFunctionEvaluator : FunctionEvaluator {
      * @param function LUT to perform the evaluation on
      * @param output Stage at which to output, either right after blind-rotation or after key-switching.
      */
-    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, uint64_t* RESTRICTED lut_rlwe, OutputKeyType output) override;
+    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, uint64_t* RESTRICTED lut_rlwe) override;
 
     /** Function evaluation with a (possibly encrypted) negacyclic LUT in lut_rlwe
      * where N is the ring dimension and Q is the ring Q
@@ -100,13 +100,9 @@ struct KSFunctionEvaluator : FunctionEvaluator {
      * @param function LUT to perform the evaluation on
      * @param output Stage at which to output, either right after blind-rotation or after key-switching.
      */
-    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input,  std::vector<uint64_t>& lut_rlwe, OutputKeyType output) override;
+    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input,  std::vector<uint64_t>& lut_rlwe) override;
 
-    void Finalize(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input) override;
-
-    void Finalize(std::vector<uint64_t>& result, const std::vector<uint64_t>& input) override;
-
-    [[nodiscard]] std::shared_ptr<const KSFunctionEvaluationContext> GetContext() const;
+    [[nodiscard]] const std::shared_ptr<const KSFunctionEvaluationContext> GetContext() const override;
 
     uint64_t EstimatePadding(const uint64_t* poly) const;
 
@@ -116,7 +112,7 @@ struct KSFunctionEvaluator : FunctionEvaluator {
 
     [[nodiscard]] uint64_t GetEstimatePadding() const;
 
-    ~KSFunctionEvaluator() = default;
+    ~KSFunctionEvaluator() override = default;
 
 protected:
 

@@ -5,6 +5,7 @@
 #ifndef TOOTHPASTE_NEGACYCLIC_FUNCTION_EVALUATOR_H
 #define TOOTHPASTE_NEGACYCLIC_FUNCTION_EVALUATOR_H
 
+#include "negacyclic_function_evaluator.h"
 #include "interfaces/functional_bootstrap.h"
 #include "interfaces/operator_context.h"
 #include "interfaces/blindrotation_operator.h"
@@ -13,10 +14,9 @@
 
 struct NegacyclicFunctionEvaluator;
 
-struct NegacyclicFunctionEvaluationContext : OperatorContext<FunctionEvaluator>, public std::enable_shared_from_this<NegacyclicFunctionEvaluationContext> {
+struct NegacyclicFunctionEvaluationContext : OperatorContext<NegacyclicFunctionEvaluator>, public std::enable_shared_from_this<NegacyclicFunctionEvaluationContext> {
 
-    NegacyclicFunctionEvaluationContext(std::shared_ptr<OperatorContext<BlindRotator>> blind_rotation_context,
-                                        std::shared_ptr<LWEConversionContext> converter);
+    NegacyclicFunctionEvaluationContext(std::shared_ptr<OperatorContext<BlindRotator>> blind_rotation_context);
 
     [[nodiscard]] std::shared_ptr<OperatorContext<BlindRotator>> GetBlindRotationContext() const;
 
@@ -24,7 +24,7 @@ struct NegacyclicFunctionEvaluationContext : OperatorContext<FunctionEvaluator>,
 
     [[nodiscard]] long double ComputeOutputVariance(long double input_variance = 0.0) const override;
 
-    [[nodiscard]] std::unique_ptr<FunctionEvaluator> ConstructOperator(const std::vector<GenericKey>& keys) const override;
+    [[nodiscard]] std::unique_ptr<NegacyclicFunctionEvaluator> ConstructOperator(const std::vector<GenericKey>& keys) const override;
 
     /** Describes the input LWE sample
      *
@@ -51,11 +51,10 @@ struct NegacyclicFunctionEvaluationContext : OperatorContext<FunctionEvaluator>,
 private:
 
     std::shared_ptr<OperatorContext<BlindRotator>> m_rotation_context;
-    std::shared_ptr<LWEConversionContext> m_lwe_to_lwe_converter;
 
 };
 
-struct NegacyclicFunctionEvaluator : FunctionEvaluator {
+struct NegacyclicFunctionEvaluator : FunctionEvaluator<NegacyclicFunctionEvaluationContext> {
 
     friend struct NegacyclicFunctionEvaluationContext;
 
@@ -66,7 +65,7 @@ struct NegacyclicFunctionEvaluator : FunctionEvaluator {
      * @param function Function to be evaluated
      * @param output Stage at which to output, either right after blind-rotation or after key-switching.
      */
-    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, std::function<uint64_t(uint64_t)>& function, OutputKeyType output) override;
+    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, std::function<uint64_t(uint64_t)>& function) override;
 
     /** Function evaluation with a provided negacyclic function mapping Z_{2N} to Z_Q
      * where N is the ring dimension and Q is the ring Q
@@ -75,7 +74,7 @@ struct NegacyclicFunctionEvaluator : FunctionEvaluator {
      * @param function Function to be evaluated
      * @param output Stage at which to output, either right after blind-rotation or after key-switching.
      */
-    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input, std::function<uint64_t(uint64_t)>& function, OutputKeyType output) override;
+    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input, std::function<uint64_t(uint64_t)>& function) override;
 
     /** Function evaluation with a (possibly encrypted) negacyclic LUT in lut_rlwe
      * where N is the ring dimension and Q is the ring Q
@@ -84,38 +83,31 @@ struct NegacyclicFunctionEvaluator : FunctionEvaluator {
      * @param function LUT to perform the evaluation on
      * @param output Stage at which to output, either right after blind-rotation or after key-switching.
      */
-    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, uint64_t* RESTRICTED lut_rlwe, OutputKeyType output) override;
+    void EvalFunc(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input_lwe, uint64_t* RESTRICTED lut_rlwe) override;
 
     /** Function evaluation with a (possibly encrypted) negacyclic LUT in lut_rlwe
      * where N is the ring dimension and Q is the ring Q
      *
      * @param result Buffer for output LWE
-     * @param function LUT to perform the evaluation on
-     * @param output Stage at which to output, either right after blind-rotation or after key-switching.
+     * @param input Input LWE
+     * @param lut_rlwe LUT as vector
      */
-    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input,  std::vector<uint64_t>& lut_rlwe, OutputKeyType output) override;
+    void EvalFunc(std::vector<uint64_t>& result, const std::vector<uint64_t>& input,  std::vector<uint64_t>& lut_rlwe) override;
 
-    void Finalize(uint64_t* RESTRICTED result, const uint64_t* RESTRICTED input) override;
+    [[nodiscard]] const std::shared_ptr<const NegacyclicFunctionEvaluationContext> GetContext() const override;
 
-    void Finalize(std::vector<uint64_t>& result, const std::vector<uint64_t>& input) override;
-
-    [[nodiscard]] std::shared_ptr<const NegacyclicFunctionEvaluationContext> GetContext() const;
-
-    ~NegacyclicFunctionEvaluator() = default;
+    ~NegacyclicFunctionEvaluator() override = default;
 
 private:
 
 
     NegacyclicFunctionEvaluator(std::shared_ptr<const NegacyclicFunctionEvaluationContext> ctx,
-                                std::unique_ptr<BlindRotator> rotator,
-                                std::unique_ptr<LWEtoLWEConverter> conv);
+                                std::unique_ptr<BlindRotator> rotator);
 
     /* pointer to context that constructed the operator */
     std::shared_ptr<const NegacyclicFunctionEvaluationContext> m_context;
     /* internal blind-rotator */
     std::unique_ptr<BlindRotator> m_rotator;
-    /* converter from LWE with ring dimension/Q to target output LWE */
-    std::unique_ptr<LWEtoLWEConverter> m_converter;
     /* temporary buffer for blind-rotation */
     AlignedBuffer m_acc_buffer;
 

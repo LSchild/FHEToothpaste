@@ -39,7 +39,7 @@ KSFunctionEvaluationContext::KSFunctionEvaluationContext(
 
 }
 
-std::unique_ptr<FunctionEvaluator>
+std::unique_ptr<KSFunctionEvaluator>
 KSFunctionEvaluationContext::ConstructOperator(const std::vector<GenericKey> &keys) const {
 
     auto rotator = m_blind_rotation_context->ConstructOperator(keys);
@@ -123,7 +123,7 @@ uint64_t KSFunctionEvaluator::EstimatePadding(std::vector<uint64_t> &poly) const
     return EstimatePadding(poly.data());
 }
 
-std::shared_ptr<const KSFunctionEvaluationContext> KSFunctionEvaluator::GetContext() const {
+const std::shared_ptr<const KSFunctionEvaluationContext> KSFunctionEvaluator::GetContext() const {
     return m_context;
 }
 
@@ -135,32 +135,23 @@ uint64_t KSFunctionEvaluator::GetPaddingWidth() const {
     return m_padding_width;
 }
 
-void KSFunctionEvaluator::Finalize(std::vector<uint64_t> &result, const std::vector<uint64_t> &input) {
-    Finalize(result.data(), input.data());
-}
-
-void KSFunctionEvaluator::Finalize(uint64_t *result, const uint64_t *input) {
-    // todo include Q switch
-    m_converter->Convert(result, input);
-}
 
 void KSFunctionEvaluator::EvalFunc(std::vector<uint64_t> &result, const std::vector<uint64_t> &input,
-                                   std::vector<uint64_t> &lut_rlwe, OutputKeyType output) {
+                                   std::vector<uint64_t> &lut_rlwe) {
 
 }
 
 void
-KSFunctionEvaluator::EvalFunc(uint64_t *result, const uint64_t *input_lwe, uint64_t *lut_rlwe, OutputKeyType output) {
+KSFunctionEvaluator::EvalFunc(uint64_t *result, const uint64_t *input_lwe, uint64_t *lut_rlwe) {
 
 }
 
 void KSFunctionEvaluator::EvalFunc(std::vector<uint64_t> &result, const std::vector<uint64_t> &input,
-                                   std::function<uint64_t(uint64_t)> &function, OutputKeyType output) {
+                                   std::function<uint64_t(uint64_t)> &function) {
 
 }
 
 void
-KSFunctionEvaluator::EvalFunc(uint64_t *result, const uint64_t *input_lwe, std::function<uint64_t(uint64_t)> &function,
-                              OutputKeyType output) {
+KSFunctionEvaluator::EvalFunc(uint64_t *result, const uint64_t *input_lwe, std::function<uint64_t(uint64_t)> &function) {
 
 }
